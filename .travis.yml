@@ -9,7 +9,10 @@ julia:
 matrix:
   fast_finish: true
 before_script:
-  - sudo apt-get install gmsh
+  - curl -OL http://gmsh.info/bin/Linux/gmsh-git-Linux64-sdk.tgz
+  - tar xfv gmsh-git-Linux64-sdk.tgz
+  - GMSHROOT=`pwd`/gmsh-git-Linux64-sdk
+  - export PATH=$PATH:$GMSHROOT/bin
 notifications:
   email:
     on_success: never
