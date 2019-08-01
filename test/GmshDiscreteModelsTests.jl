@@ -1,5 +1,6 @@
 module GmshDiscreteModelsTests
 
+using Test
 using GridapGmsh
 using Gridap
 
@@ -7,6 +8,15 @@ mshfile = "test/t1.msh"
 
 model = GmshDiscreteModel(mshfile)
 
-writevtk(model,"model")
+d = mktempdir()
+f = joinpath(d,"model")
+
+writevtk(model,f)
+
+@test filesize("$(f)_0.vtu") > 0
+@test filesize("$(f)_1.vtu") > 0
+@test filesize("$(f)_2.vtu") > 0
+
+rm(d,recursive=true)
 
 end # module
