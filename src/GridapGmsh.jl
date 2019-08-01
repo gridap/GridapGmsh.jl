@@ -1,6 +1,13 @@
 module GridapGmsh
 
 using Libdl
+using Gridap
+using Gridap.CellValuesGallery
+using Gridap.DiscreteModels: DiscreteModelFromData
+using StaticArrays
+using UnstructuredGrids.Kernels
+
+export GmshDiscreteModel
 
 deps_jl = joinpath(@__DIR__, "..", "deps", "deps.jl")
 if !isfile(deps_jl)
@@ -21,5 +28,7 @@ function __init__()
         Libdl.dlopen(gmsh.lib, Libdl.RTLD_LAZY | Libdl.RTLD_GLOBAL)
     end
 end
+
+include("GmshDiscreteModels.jl")
 
 end # module
