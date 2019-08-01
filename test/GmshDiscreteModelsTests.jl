@@ -6,6 +6,7 @@ using Gridap
 using Gridap.CellValuesGallery
 using Gridap.DiscreteModels: DiscreteModelFromData
 using StaticArrays
+using UnstructuredGrids.Kernels
 
 include("../src/GmshDiscreteModels.jl")
 

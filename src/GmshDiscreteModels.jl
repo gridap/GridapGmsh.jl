@@ -137,6 +137,13 @@ function _setup_face_labels(
   dim_to_face_to_label = [
     fill(UNSET,length(connections(graph,d,0))) for d in 0:D ]
 
+  _fill_dim_to_face_to_label!(
+    dim_to_face_to_label,
+    graph,
+    dim_to_gface_to_nodes,
+    dim_gface_to_entity,
+    dim_to_offset)
+
   tag_to_labels = _setup_tag_to_labels(
     dim_to_group_to_entities,dim_to_offset)
 
@@ -144,6 +151,72 @@ function _setup_face_labels(
 
   FaceLabels(dim_to_face_to_label,tag_to_labels,tag_to_name)
 
+end
+
+function _fill_dim_to_face_to_label!(
+  dim_to_face_to_label,
+  graph,
+  dim_to_gface_to_nodes,
+  dim_gface_to_entity,
+  dim_to_offset)
+
+  D = length(dim_to_face_to_label)-1
+  d = D
+  cell_to_entity =  dim_gface_to_entity[d+1]
+  cell_to_label = dim_to_face_to_label[d+1]
+  offset = dim_to_offset[d+1]
+  _apply_offset_for_cells!(cell_to_label,cell_to_entity,offset)
+
+  for d in 0:(D-1)
+
+    gface_to_nodes = dim_to_gface_to_nodes[d+1]
+    face_to_nodes = connections(graph,d,0)
+    node_to_faces = connections(graph,0,d)
+    gface_to_face = _setup_gface_to_face(
+      face_to_nodes,
+      node_to_faces,
+      gface_to_nodes)
+    face_to_label = dim_to_face_to_label[d+1]
+    gface_to_entity = dim_gface_to_entity[d+1]
+    offset = dim_to_offset[d+1]
+    _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,offset)
+
+  end
+
+end
+
+function _setup_gface_to_face(
+  face_to_nodes,
+  node_to_faces,
+  gface_to_nodes)
+
+  gface_to_face = find_gface_to_face(
+    face_to_nodes.data,
+    face_to_nodes.ptrs,
+    node_to_faces.data,
+    node_to_faces.ptrs,
+    gface_to_nodes.data,
+    gface_to_nodes.ptrs)
+
+  gface_to_face
+
+end
+
+function _apply_offset_for_cells!(cell_to_label,cell_to_entity,offset)
+  ncells = length(cell_to_label)
+  for cell in 1:ncells
+    entity = cell_to_entity[cell]
+    cell_to_label[cell] = entity+offset
+  end
+end
+
+function _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,offset)
+  ngfaces = length(gface_to_face)
+  for gface in 1:ngfaces
+    entity = gface_to_entity[gface]
+    face = gface_to_face[gface]
+    face_to_label[face] = entity+offset
+  end
 end
 
 function _setup_tag_to_labels(dim_to_group_to_entities,dim_to_offset)
@@ -201,7 +274,7 @@ end
 
 function _setup_cell_to_entity(gmsh,d,ncells,nmin)
 
-  cell_to_entity = zeros(Int,ncells)
+  cell_to_entity = fill(UNSET,ncells)
   entities = gmsh.model.getEntities(d)
   for e in entities
     _, elemTags, _ = gmsh.model.mesh.getElements(e[1], e[2])
@@ -415,5 +488,99 @@ function _setup_etype_to_nlnodes(elemTypes,gmsh)
   end
   etype_to_nlnodes
 end
+
+
+# TODO to be moved to UnstructuredGrids (begin)
+
+using UnstructuredGrids.Kernels: max_cells_arround_vertex
+using UnstructuredGrids.Kernels: _fill_cells_around_scratch!
+using UnstructuredGrids.Kernels: _set_intersection!
+
+function find_gface_to_face(
+  face_to_nodes_data,
+  face_to_nodes_ptrs,
+  node_to_faces_data::AbstractVector{T},
+  node_to_faces_ptrs,
+  gface_to_nodes_data,
+  gface_to_nodes_ptrs) where T
+
+  ngfaces = length(gface_to_nodes_ptrs) - 1
+  gface_to_face = zeros(T,ngfaces)
+  n = max_cells_arround_vertex(node_to_faces_ptrs)
+  faces_around = fill(UNSET,n)
+  faces_around_scratch = fill(UNSET,n)
+
+  _fill_gface_to_face!(
+    gface_to_face,
+    face_to_nodes_data,
+    face_to_nodes_ptrs,
+    node_to_faces_data,
+    node_to_faces_ptrs,
+    gface_to_nodes_data,
+    gface_to_nodes_ptrs,
+    faces_around,
+    faces_around_scratch)
+
+  gface_to_face
+
+end
+
+function  _fill_gface_to_face!(
+  gface_to_face,
+  face_to_nodes_data,
+  face_to_nodes_ptrs,
+  node_to_faces_data,
+  node_to_faces_ptrs,
+  gface_to_nodes_data,
+  gface_to_nodes_ptrs,
+  faces_around,
+  faces_around_scratch)
+
+  ngfaces = length(gface_to_nodes_ptrs) - 1
+
+  nfaces_around = UNSET
+  nfaces_around_scratch = UNSET
+
+  for gface in 1:ngfaces
+
+    a = gface_to_nodes_ptrs[gface]-1
+    b = gface_to_nodes_ptrs[gface+1]
+    nlnodes = b-(a+1)
+
+    for lnode in 1:nlnodes
+      node = gface_to_nodes_data[lnode+a]
+      if lnode == 1
+        nfaces_around = _fill_cells_around_scratch!(
+          faces_around,
+          node,
+          node_to_faces_data,
+          node_to_faces_ptrs)
+      else
+        nfaces_around_scratch = _fill_cells_around_scratch!(
+          faces_around_scratch,
+          node,
+          node_to_faces_data,
+          node_to_faces_ptrs)
+        _set_intersection!(
+          faces_around,faces_around_scratch,
+          nfaces_around,nfaces_around_scratch)
+      end
+    end
+
+    for face in faces_around
+      if face != UNSET
+        gface_to_face[gface] = face
+        break
+      end
+    end
+
+  end
+
+end
+
+# TODO to be moved to UnstructuredGrids (end)
+
+
+
 
 
