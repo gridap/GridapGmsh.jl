@@ -422,9 +422,29 @@ function _setup_connectivity(gmsh,d)
 
   elemTypes, elemTags, nodeTags = gmsh.model.mesh.getElements(d)
 
+  if length(elemTypes) == 0
+
+    ncells = 0
+    ndata = 0
+    nmin = 1
+    cell_to_nodes_prts = zeros(Int,ncells+1)
+    cell_to_nodes_data = zeros(Int,ndata)
+    cell_to_nodes = CellVectorFromDataAndPtrs(
+      cell_to_nodes_data,cell_to_nodes_prts)
+
+    cell_to_extrusion = nothing
+    cell_to_order = nothing
+
+    nmin = 1
+    return (cell_to_nodes, nmin, cell_to_extrusion, cell_to_order)
+
+  end
+
   ncells, nmin, nmax = _check_cell_tags(elemTags)
-  ndata = sum([length(t) for t in nodeTags])
+
   etype_to_nlnodes = _setup_etype_to_nlnodes(elemTypes,gmsh)
+
+  ndata = sum([length(t) for t in nodeTags])
 
   cell_to_nodes_prts = zeros(Int,ncells+1)
   cell_to_nodes_data = zeros(Int,ndata)
