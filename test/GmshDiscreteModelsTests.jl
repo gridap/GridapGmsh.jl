@@ -4,7 +4,7 @@ using Test
 using GridapGmsh
 using Gridap
 
-mshfile = "test/t1.msh"
+mshfile = joinpath(@__DIR__,"t1.msh")
 
 model = GmshDiscreteModel(mshfile)
 
