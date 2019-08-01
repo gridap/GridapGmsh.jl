@@ -7,9 +7,9 @@ julia:
 matrix:
   fast_finish: true
 before_script:
-  - curl -OL http://gmsh.info/bin/Linux/gmsh-git-Linux64-sdk.tgz
-  - tar xfv gmsh-git-Linux64-sdk.tgz
-  - GMSHROOT=`pwd`/gmsh-git-Linux64-sdk
+  - curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
+  - tar xfv gmsh-4.4.1-Linux64-sdk.tgz
+  - GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
   - export PATH=$PATH:$GMSHROOT/bin
 notifications:
   email:
