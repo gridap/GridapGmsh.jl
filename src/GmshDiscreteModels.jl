@@ -89,7 +89,7 @@ function _setup_dim_to_group_to_entities(gmsh)
     pgs = gmsh.model.getPhysicalGroups(d)
     n = length(pgs)
     group_to_entities = Vector{Int}[]
-    for (i,pg) in enumerate(pgs)
+    for pg in pgs
       es = gmsh.model.getEntitiesForPhysicalGroup(pg...)
       entities = Int[]
       for e in es
@@ -109,8 +109,8 @@ function _setup_dim_to_group_to_name(gmsh)
     pgs = gmsh.model.getPhysicalGroups(d)
     n = length(pgs)
     names = String[]
-    for (i,pg) in enumerate(pgs)
-      _name = gmsh.model.getPhysicalName(d,i)
+    for pg in pgs
+      _name = gmsh.model.getPhysicalName(pg...)
       if _name == ""
         name = "untitled$u"
         u += 1
@@ -180,6 +180,40 @@ function _fill_dim_to_face_to_label!(
     gface_to_entity = dim_gface_to_entity[d+1]
     offset = dim_to_offset[d+1]
     _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,offset)
+
+  end
+
+  for d = 0:(D-1)
+    for j in (d+1):D
+      dface_to_jfaces = connections(graph,d,j)
+      dface_to_label = dim_to_face_to_label[d+1]
+      jface_to_label = dim_to_face_to_label[j+1]
+      _fix_dface_to_label!(dface_to_label,jface_to_label,dface_to_jfaces)
+    end
+  end
+
+end
+
+function _fix_dface_to_label!(dface_to_label,jface_to_label,dface_to_jfaces)
+
+  ndfaces = length(dface_to_label)
+  @assert ndfaces == length(dface_to_jfaces)
+
+  for dface in 1:ndfaces
+
+    dlabel = dface_to_label[dface]
+    if dlabel != UNSET
+      continue
+    end
+
+    jfaces = dface_to_jfaces[dface]
+    for jface in jfaces
+      jlabel = jface_to_label[jface]
+      if jlabel != UNSET
+        dface_to_label[dface] = jlabel
+        break
+      end
+    end
 
   end
 
