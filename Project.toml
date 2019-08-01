@@ -4,7 +4,9 @@ authors = ["Francesc Verdugo <fverdugo@cimne.upc.edu>"]
 version = "0.1.0"
 
 [deps]
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 julia = "1"
