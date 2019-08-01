@@ -8,6 +8,7 @@ using StaticArrays
 
 const D3=3
 const POINT=15
+const UNSET = 0
 
 function explore(mshfile)
 
@@ -37,17 +38,6 @@ function explore(mshfile)
   dim_to_group_to_entities = _setup_dim_to_group_to_entities(gmsh)
   dim_to_group_to_name = _setup_dim_to_group_to_name(gmsh)
 
-  @show dim_to_group_to_entities
-  @show dim_to_group_to_name
-
-  #facelabels = _setup_face_labels(
-  #  graph,
-  #  dim_to_gface_to_nodes,
-  #  dim_gface_to_entity,
-  #  dim_to_offset,
-  #  dim_to_group_to_entities,
-  #  dim_to_group_to_name)
-
   grid2 = UnstructuredGrid(
     node_to_coords,
     cell_to_nodes.data,
@@ -70,6 +60,14 @@ function explore(mshfile)
     node_to_nodes.ptrs,
     node_to_extrusion,
     node_to_order)
+
+  facelabels = _setup_face_labels(
+    graph,
+    dim_to_gface_to_nodes,
+    dim_gface_to_entity,
+    dim_to_offset,
+    dim_to_group_to_entities,
+    dim_to_group_to_name)
 
   writevtk(grid2,"grid2",celldata=["entity"=>cell_to_entity])
   writevtk(grid1,"grid1",celldata=["entity"=>facet_to_entity])
@@ -155,7 +153,7 @@ function _setup_face_labels(
   D = ndims(graph)
 
   dim_to_face_to_label = [
-    zeros(Int,length(connections(graph,d,0))) for d in 0:D ]
+    fill(UNSET,length(connections(graph,d,0))) for d in 0:D ]
 
   tag_to_labels = _setup_tag_to_labels(
     dim_to_group_to_entities,dim_to_offset)
