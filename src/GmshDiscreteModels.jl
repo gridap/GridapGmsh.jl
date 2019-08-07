@@ -30,6 +30,9 @@ function GmshDiscreteModel(mshfile)
 
   dim_to_offset = _setup_dim_to_offset(gmsh)
 
+  nnodes = length(node_to_coords)
+  node_to_label = _setup_node_to_label(gmsh,dim_to_offset,nnodes)
+
   gmsh.finalize()
 
   graph = FullGridGraph(grid)
@@ -40,12 +43,23 @@ function GmshDiscreteModel(mshfile)
     dim_gface_to_entity,
     dim_to_offset,
     dim_to_group_to_entities,
-    dim_to_group_to_name)
+    dim_to_group_to_name,
+    node_to_label)
 
   grids = _setup_model_grids(graph,grid,D)
 
   DiscreteModelFromData( grids, graph, facelabels)
 
+end
+
+function _setup_node_to_label(gmsh,dim_to_offset,nnodes)
+  node_to_label = zeros(Int,nnodes)
+  entities = gmsh.model.getEntities()
+  for (dim, entity) in entities
+    nodes, _, _ = gmsh.model.mesh.getNodes(dim, entity)
+    node_to_label[nodes] .= (entity + dim_to_offset[dim+1])
+  end
+  node_to_label
 end
 
 function _setup_grid(gmsh,D,node_to_coords)
@@ -130,12 +144,16 @@ function _setup_face_labels(
   dim_gface_to_entity,
   dim_to_offset,
   dim_to_group_to_entities,
-  dim_to_group_to_name)
+  dim_to_group_to_name,
+  node_to_label)
 
   D = ndims(graph)
 
-  dim_to_face_to_label = [
-    fill(UNSET,length(connections(graph,d,0))) for d in 0:D ]
+  dim_to_face_to_label = [node_to_label,]
+  for d in 1:D
+    z = fill(UNSET,length(connections(graph,d,0)))
+    push!(dim_to_face_to_label,z)
+  end
 
   _fill_dim_to_face_to_label!(
     dim_to_face_to_label,

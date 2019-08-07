@@ -10,6 +10,7 @@ model = GmshDiscreteModel(mshfile)
 
 d = mktempdir()
 f = joinpath(d,"model")
+#f = "model"
 
 writevtk(model,f)
 
