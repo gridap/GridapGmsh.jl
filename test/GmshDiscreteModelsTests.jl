@@ -6,7 +6,7 @@ using Gridap
 
 d = mktempdir()
 f = joinpath(d,"model")
-f = "model"
+#f = "model"
 
 mshfile = joinpath(@__DIR__,"t1.msh")
 model = GmshDiscreteModel(mshfile)
