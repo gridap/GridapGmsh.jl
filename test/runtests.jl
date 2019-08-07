@@ -11,4 +11,8 @@ end
  include("GmshDiscreteModelsTests.jl")
 end
 
+@testset "LagrangianFESpaces" begin
+ include("LagrangianFESpacesTests.jl")
+end
+
 end # module
