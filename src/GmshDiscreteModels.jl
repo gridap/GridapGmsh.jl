@@ -163,7 +163,7 @@ function _setup_face_labels(
     dim_gface_to_entity,
     dim_to_offset)
 
-  tag_to_name, tag_to_groups = _setup_tag_to_name(dim_to_group_to_name)
+  tag_to_name, tag_to_groups, _ = _setup_tag_to_name(dim_to_group_to_name)
 
   tag_to_labels = _setup_tag_to_labels(
     tag_to_groups,dim_to_group_to_entities,dim_to_offset)
@@ -317,7 +317,7 @@ function _setup_tag_to_name(dim_to_group_to_name)
       end
     end
   end
-  (tag_to_name, tag_to_groups)
+  (tag_to_name, tag_to_groups, name_to_tag)
 end
 
 function _setup_dim_to_offset(gmsh)

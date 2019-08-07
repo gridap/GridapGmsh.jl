@@ -3,11 +3,15 @@ module GridapGmsh
 using Libdl
 using Gridap
 using Gridap.CellValuesGallery
-using Gridap.DiscreteModels: DiscreteModelFromData
 using StaticArrays
 using UnstructuredGrids.Kernels
 
 export GmshDiscreteModel
+export GmshCLagrangianFESpace
+export GmshDLagrangianFESpace
+
+using Gridap.DiscreteModels: DiscreteModelFromData
+
 
 deps_jl = joinpath(@__DIR__, "..", "deps", "deps.jl")
 if !isfile(deps_jl)
@@ -30,5 +34,7 @@ function __init__()
 end
 
 include("GmshDiscreteModels.jl")
+
+include("LagrangianFESpaces.jl")
 
 end # module
