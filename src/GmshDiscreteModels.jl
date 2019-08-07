@@ -150,6 +150,7 @@ function _setup_face_labels(
   D = ndims(graph)
 
   dim_to_face_to_label = [node_to_label,]
+  
   for d in 1:D
     z = fill(UNSET,length(connections(graph,d,0)))
     push!(dim_to_face_to_label,z)
@@ -162,10 +163,10 @@ function _setup_face_labels(
     dim_gface_to_entity,
     dim_to_offset)
 
-  tag_to_labels = _setup_tag_to_labels(
-    dim_to_group_to_entities,dim_to_offset)
+  tag_to_name, tag_to_groups = _setup_tag_to_name(dim_to_group_to_name)
 
-  tag_to_name = _setup_tag_to_name(dim_to_group_to_name)
+  tag_to_labels = _setup_tag_to_labels(
+    tag_to_groups,dim_to_group_to_entities,dim_to_offset)
 
   FaceLabels(dim_to_face_to_label,tag_to_labels,tag_to_name)
 
@@ -271,30 +272,52 @@ function _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,of
   end
 end
 
-function _setup_tag_to_labels(dim_to_group_to_entities,dim_to_offset)
+function _setup_tag_to_labels(
+  tag_to_groups,dim_to_group_to_entities,dim_to_offset)
+
   tag_to_labels = Vector{Int}[]
-  for (dim,group_to_entities) in enumerate(dim_to_group_to_entities)
-    offset = dim_to_offset[dim]
-    for entities in group_to_entities
-      n = length(entities)
-      labels = zeros(Int,n)
-      for i in 1:n
-        labels[i] = entities[i] + offset
+  for groups in tag_to_groups
+
+    labels = Int[]
+    for group in groups
+      dim, id = group
+      offset = dim_to_offset[dim]
+      entities = dim_to_group_to_entities[dim][id]
+      for entity in entities
+        label = entity + offset
+        push!(labels,label)
       end
-      push!(tag_to_labels,labels)
     end
+    push!(tag_to_labels,labels)
+
   end
+
   tag_to_labels
+
 end
 
 function _setup_tag_to_name(dim_to_group_to_name)
   tag_to_name = String[]
-  for group_to_name in dim_to_group_to_name
-    for name in group_to_name
-      push!(tag_to_name,name)
+  tag_to_groups = Vector{Tuple{Int,Int}}[]
+  name_to_tag = Dict{String,Int}()
+  tag = 1
+  for (dim, group_to_name) in enumerate(dim_to_group_to_name)
+    for (id,name) in enumerate(group_to_name)
+      group = (dim,id)
+      if !haskey(name_to_tag,name)
+        push!(tag_to_name,name)
+        groups = [group,]
+        push!(tag_to_groups,groups)
+        name_to_tag[name] = tag
+        tag += 1
+      else
+        _tag = name_to_tag[name]
+        groups = tag_to_groups[_tag]
+        push!(groups,group)
+      end
     end
   end
-  tag_to_name
+  (tag_to_name, tag_to_groups)
 end
 
 function _setup_dim_to_offset(gmsh)
@@ -302,7 +325,9 @@ function _setup_dim_to_offset(gmsh)
   dim_to_nentities = zeros(Int,D3+1)
   for e in entities
     d = e[1]
-    dim_to_nentities[d+1] += 1
+    id = e[2]
+    _id = dim_to_nentities[d+1]
+    dim_to_nentities[d+1] = max(id,_id)
   end
   dim_to_offset = zeros(Int,D3+1)
   for d=1:D3

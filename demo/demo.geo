@@ -114,3 +114,9 @@ Physical Surface("boundary1") = {65, 61};
 Physical Surface("boundary2") = {207, 123, 165, 211, 127, 169};
 //+
 Physical Volume("volume") = {1, 4, 2, 3};
+//+
+Physical Curve("boundary2") = {98, 12, 97, 13, 122, 164, 206};
+//+
+Physical Curve("boundary1") = {60};
+//+
+Physical Point("boundary2") = {110, 5};
