@@ -150,7 +150,7 @@ function _setup_face_labels(
   D = ndims(graph)
 
   dim_to_face_to_label = [node_to_label,]
-  
+
   for d in 1:D
     z = fill(UNSET,length(connections(graph,d,0)))
     push!(dim_to_face_to_label,z)
@@ -499,7 +499,8 @@ function _setup_connectivity(gmsh,d)
     etype_to_nlnodes,
     elemTypes,
     elemTags,
-    nodeTags)
+    nodeTags,
+    d)
 
   cell_to_nodes = CellVectorFromDataAndPtrs(cell_to_nodes_data,cell_to_nodes_prts)
 
@@ -548,7 +549,8 @@ function  _fill_connectivity!(
     etype_to_nlnodes,
     elemTypes,
     elemTags,
-    nodeTags)
+    nodeTags,
+    d)
 
   for (j,etype) in enumerate(elemTypes)
     nlnodes = etype_to_nlnodes[etype]
@@ -564,6 +566,9 @@ function  _fill_connectivity!(
     nlnodes = etype_to_nlnodes[etype]
     i_to_cell = elemTags[j]
     i_lnode_to_node = nodeTags[j]
+    if (nlnodes == d+1)
+      _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
+    end
     for (i,cell) in enumerate(i_to_cell)
       a = cell_to_nodes_prts[cell-o]-1
       for lnode in 1:nlnodes
@@ -675,9 +680,14 @@ function  _fill_gface_to_face!(
 
 end
 
+function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
+  aux = zeros(eltype(i_lnode_to_node),nlnodes)
+  offset = nlnodes-1
+  for i in 1:nlnodes:length(i_lnode_to_node)
+    aux = i_lnode_to_node[i:i+offset]
+    sort!(aux)
+    i_lnode_to_node[i:i+offset] = aux
+  end
+end
+
 # TODO to be moved to UnstructuredGrids (end)
-
-
-
-
-
