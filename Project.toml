@@ -10,7 +10,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 UnstructuredGrids = "9cd2e232-b78e-5341-8154-33bf4eafe965"
 
 [compat]
-Gridap = "0.4.0"
+Gridap = "0.5.0"
 StaticArrays = "0.10.3"
 UnstructuredGrids = "0.2.2"
 julia = "1"

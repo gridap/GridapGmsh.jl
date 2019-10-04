@@ -22,7 +22,7 @@ fespace = GmshCLagrangianFESpace(T, mshfile, dirinames, dirimasks)
 grid = fespace.grid
 
 trian = Triangulation(grid)
-quad = CellQuadrature(trian,order=2)
+quad = CellQuadrature(trian,degree=2)
 
 uh = interpolate(fespace,ufun)
 
@@ -40,7 +40,7 @@ fespace = GmshDLagrangianFESpace(T, mshfile, dirinames, dirimasks)
 grid = fespace.grid
 
 trian = Triangulation(grid)
-quad = CellQuadrature(trian,order=2)
+quad = CellQuadrature(trian,degree=2)
 
 uh = interpolate(fespace,ufun)
 
