@@ -27,4 +27,32 @@ writevtk(model,f)
 
 rm(d,recursive=true)
 
+mshfile = joinpath(@__DIR__,"../demo/","demo.msh")
+model = GmshDiscreteModel(mshfile)
+
+order = 3
+
+fespace = FESpace(
+  reffe=:Lagrangian, order=order, valuetype=Float64,
+  conformity=:H1, model=model)
+
+U = TrialFESpace(fespace)
+
+u(x) = x[1]*x[2]*x[3]
+
+uh = interpolate(U,u)
+
+trian = Triangulation(model)
+quad = CellQuadrature(trian,degree=3*order)
+
+e = u - uh
+
+ce = integrate( inner(e,e), trian, quad)
+
+#writevtk(trian,"trian",celldata=["ce"=>ce],cellfields=["e"=>e,"uh"=>uh,"u"=>CellField(trian,u)])
+
+tol = 1.e-8
+r = sum( ce  )
+@test r < tol
+
 end # module
