@@ -303,12 +303,6 @@ uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 [[Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
-[[UnstructuredGrids]]
-deps = ["WriteVTK"]
-git-tree-sha1 = "be2bed74dcb7372dbea714d4d6385c3e083c0da1"
-uuid = "9cd2e232-b78e-5341-8154-33bf4eafe965"
-version = "0.2.2"
-
 [[WriteVTK]]
 deps = ["Base64", "CodecZlib", "LightXML", "Random", "TranscodingStreams"]
 git-tree-sha1 = "56ecc7c5a0c0dd12ec5d62610f4862420cd8af2f"
