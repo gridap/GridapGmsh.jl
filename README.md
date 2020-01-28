@@ -17,29 +17,27 @@ model = GmshDiscreteModel("demo/demo.msh")
 
 order = 1
 diritags = ["boundary1", "boundary2"]
-fespace = ConformingFESpace(Float64,model,order,diritags)
 
-ufun1(x) = 0.0
-ufun2(x) = 1.0
-V = TestFESpace(fespace)
-U = TrialFESpace(fespace,[ufun1,ufun2])
+V = TestFESpace(
+  reffe=:Lagrangian,
+  order=1,
+  valuetype=Float64,
+  model=model,
+  dirichlet_tags=["boundary1","boundary2"])
 
-trian = Triangulation(model)
-quad = CellQuadrature(trian,order=2)
+U = TrialFESpace(V,[0,1])
+
+trian = get_triangulation(model)
+degree = 2
+quad = CellQuadrature(trian,degree)
 
 a(v,u) = inner(∇(v), ∇(u))
 t_Ω = LinearFETerm(a,trian,quad)
 
-assem = SparseMatrixAssembler(V,U)
+op = AffineFEOperator(V,U,t_Ω)
 
-op = LinearFEOperator(V,U,assem,t_Ω)
-
-ls = LUSolver()
-solver = LinearFESolver(ls)
-
-uh = solve(solver,op)
+uh = solve(op)
 writevtk(trian,"demo",cellfields=["uh"=>uh])
-
 ```
 
 ![](demo/demo.png)

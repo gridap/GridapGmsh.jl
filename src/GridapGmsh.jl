@@ -1,16 +1,17 @@
 module GridapGmsh
 
 using Libdl
-using Gridap
-using Gridap.CellValuesGallery
-using StaticArrays
-using UnstructuredGrids.Kernels
+
+using Gridap.Arrays
+using Gridap.TensorValues
+using Gridap.Fields
+using Gridap.ReferenceFEs
+using Gridap.Geometry
+using Gridap.Geometry: max_cells_arround_vertex
+using Gridap.Geometry: _fill_cells_around_scratch!
+using Gridap.Geometry: _set_intersection!
 
 export GmshDiscreteModel
-export GmshCLagrangianFESpace
-export GmshDLagrangianFESpace
-
-using Gridap.DiscreteModels: DiscreteModelFromData
 
 
 deps_jl = joinpath(@__DIR__, "..", "deps", "deps.jl")
@@ -34,7 +35,5 @@ function __init__()
 end
 
 include("GmshDiscreteModels.jl")
-
-include("LagrangianFESpaces.jl")
 
 end # module
