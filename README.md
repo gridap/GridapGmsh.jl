@@ -17,22 +17,22 @@ model = GmshDiscreteModel("demo/demo.msh")
 
 order = 1
 diritags = ["boundary1", "boundary2"]
-fespace = ConformingFESpace(Float64,model,order,diritags)
 
 ufun1(x) = 0.0
 ufun2(x) = 1.0
-V = TestFESpace(fespace)
-U = TrialFESpace(fespace,[ufun1,ufun2])
+V = TestFESpace(reffe=:Lagrangian, order=1, valuetype=Float64,
+         model=model, dirichlet_tags=["boundary1","boundary2"])
+U = TrialFESpace(V,[ufun1,ufun2])
 
-trian = Triangulation(model)
-quad = CellQuadrature(trian,order=2)
+trian = Triangulation(Gridap.ReferenceFEs.ReferenceFE{3},model)
+quad = CellQuadrature(trian,2)
 
 a(v,u) = inner(∇(v), ∇(u))
 t_Ω = LinearFETerm(a,trian,quad)
 
-assem = SparseMatrixAssembler(V,U)
+assem = Gridap.FESpaces.SparseMatrixAssembler(V,U)
 
-op = LinearFEOperator(V,U,assem,t_Ω)
+op = AffineFEOperator(V,U,assem,t_Ω)
 
 ls = LUSolver()
 solver = LinearFESolver(ls)
