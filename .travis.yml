@@ -4,7 +4,9 @@ language: julia
 os:
   - linux
 julia:
-  - 1.1
+  - 1.0
+  - 1.3
+  - nightly
 matrix:
   fast_finish: true
 before_script:
@@ -12,6 +14,10 @@ before_script:
   - tar xfv gmsh-4.4.1-Linux64-sdk.tgz
   - GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
   - export PATH=$PATH:$GMSHROOT/bin
+matrix:
+  allow_failures:
+    - julia: nightly
+  fast_finish: true
 notifications:
   email:
     on_success: never
