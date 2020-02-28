@@ -3,12 +3,16 @@ module GridapGmshTests
 using GridapGmsh
 using Test
 
-@testset "gmsh" begin
-  include("gmshTests.jl")
-end
+if GridapGmsh.GMSH_FOUND
+  @testset "gmsh" begin
+    include("gmshTests.jl")
+  end
 
-@testset "GmshDiscreteModel" begin
- include("GmshDiscreteModelsTests.jl")
+  @testset "GmshDiscreteModel" begin
+   include("GmshDiscreteModelsTests.jl")
+  end
+else
+  @warn "GridapGmsh is not loaded or installed properly."
 end
 
 end # module
