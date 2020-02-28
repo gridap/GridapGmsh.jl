@@ -4,7 +4,7 @@ const POINT=15
 const UNSET = 0
 
 function GmshDiscreteModel(mshfile)
-
+  @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
   end
