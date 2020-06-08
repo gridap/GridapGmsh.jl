@@ -27,14 +27,14 @@ V = TestFESpace(
 
 U = TrialFESpace(V,[0,1])
 
-trian = get_triangulation(model)
+trian = Triangulation(model)
 degree = 2
 quad = CellQuadrature(trian,degree)
 
-a(v,u) = inner(∇(v), ∇(u))
+a(u,v) = ∇(v)*∇(u)
 t_Ω = LinearFETerm(a,trian,quad)
 
-op = AffineFEOperator(V,U,t_Ω)
+op = AffineFEOperator(U,V,t_Ω)
 
 uh = solve(op)
 writevtk(trian,"demo",cellfields=["uh"=>uh])
