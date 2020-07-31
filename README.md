@@ -4,6 +4,10 @@
 [![Codecov](https://codecov.io/gh/gridap/GridapGmsh.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/gridap/GridapGmsh.jl)
 
 
+## Requirements
+
+`GridapGmsh` requires a working instalation of the GMSH Software Development Kit (SDK) available at [gmsh.info](https://gmsh.info/). The `gmsh` binary has to be visible from the `which` command or the equivalent in your operating system.
+
 ## Demo
 
 
@@ -31,7 +35,7 @@ trian = Triangulation(model)
 degree = 2
 quad = CellQuadrature(trian,degree)
 
-a(u,v) = ∇(v)*∇(u)
+a(u,v) = ∇(v)⋅∇(u)
 t_Ω = LinearFETerm(a,trian,quad)
 
 op = AffineFEOperator(U,V,t_Ω)
