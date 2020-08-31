@@ -52,3 +52,26 @@ writevtk(trian,"demo",cellfields=["uh"=>uh])
 
 - Vertices are always assigned to the corresponding CAD entity. However, this is not true for higher dimensional objects (i.e., edges, faces, cells). The later objects are associated with the right CAD entity if and only if thay are present in a physical group of the same dimension of the object. If the object does not belong to a physical group of the same dimension, but it belongs to the clousure of a higher dimensional object appearing in a physical group, then the low dimensional object receives the CAD id of the high dimensional object. If several high dimensional objects fullfill this requirement, we choose one arbitrary of the lowest dimension possible. This ensures, that edges and faces are assigned to the right CAD entity if the are in the interior of the CAD entity. The same is not true if the object is on the boundary of the CAD entity. In this case, include the corresponding object in a physical group if the right CAD ids are required.
 
+## How to cite Gridap
+
+In order to give credit to the `Gridap` contributors, we simply ask you to cite the reference below in any publication in which you have made use of `Gridap` packages:
+
+```
+@article{Badia2020,
+  doi = {10.21105/joss.02520},
+  url = {https://doi.org/10.21105/joss.02520},
+  year = {2020},
+  publisher = {The Open Journal},
+  volume = {5},
+  number = {52},
+  pages = {2520},
+  author = {Santiago Badia and Francesc Verdugo},
+  title = {Gridap: An extensible Finite Element toolbox in Julia},
+  journal = {Journal of Open Source Software}
+}
+```
+
+## Contact
+
+Please, contact the project administrators, [Santiago Badia](mailto:santiago.badia@monash.edu) and [Francesc Verdugo](mailto:fverdugo@cimne.upc.edu), for further questions about licenses and terms of use.
+
