@@ -172,6 +172,10 @@ function  _fill_connectivity!(
     i_lnode_to_node = nodeTags[j]
     if (nlnodes == d+1)
       _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
+    elseif (nlnodes == 4)
+      _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
+    elseif (nlnodes == 8)
+      _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
     end
     for (i,cell) in enumerate(i_to_cell)
       a = cell_to_nodes_prts[cell-o]-1
@@ -191,6 +195,26 @@ function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
     aux = i_lnode_to_node[i:i+offset]
     sort!(aux)
     i_lnode_to_node[i:i+offset] = aux
+  end
+end
+
+function _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
+  aux = zero(eltype(i_lnode_to_node))
+  offset = nlnodes-1
+  for i in 1:nlnodes:length(i_lnode_to_node)
+    aux = i_lnode_to_node[i+offset-1]
+    i_lnode_to_node[i+offset-1] = i_lnode_to_node[i+offset]
+    i_lnode_to_node[i+offset] = aux
+  end
+end
+
+function _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
+  perm = [1, 2, 4, 3, 5, 6, 8, 7]
+  aux = zeros(eltype(i_lnode_to_node),nlnodes)
+  offset = nlnodes-1
+  for i in 1:nlnodes:length(i_lnode_to_node)
+    aux = i_lnode_to_node[i:i+offset]
+    i_lnode_to_node[i:i+offset] = aux[perm]
   end
 end
 
