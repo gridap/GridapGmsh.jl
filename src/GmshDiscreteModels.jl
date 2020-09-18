@@ -3,7 +3,7 @@ const D3=3
 const POINT=15
 const UNSET = 0
 
-function GmshDiscreteModel(mshfile)
+function GmshDiscreteModel(mshfile; renumber=false)
   @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
@@ -12,7 +12,10 @@ function GmshDiscreteModel(mshfile)
   gmsh.initialize()
   gmsh.option.setNumber("General.Terminal", 1)
   gmsh.open(mshfile)
-
+  
+  renumber && gmsh.model.mesh.renumberNodes()
+  renumber && gmsh.model.mesh.renumberElements()
+  
   grid, cell_to_entity = _setup_grid(gmsh)
   grid_topology = UnstructuredGridTopology(grid)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
