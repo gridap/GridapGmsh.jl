@@ -15,4 +15,12 @@ mshfile = joinpath(@__DIR__,"..","demo","demo.msh")
 model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
 
+mshfile = joinpath(@__DIR__,"square.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+
+mshfile = joinpath(@__DIR__,"cube.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+
 end # module
