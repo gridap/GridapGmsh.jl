@@ -11,6 +11,7 @@ function GmshDiscreteModel(mshfile; renumber=true)
 
   gmsh.initialize()
   gmsh.option.setNumber("General.Terminal", 1)
+  gmsh.option.setNumber("Mesh.SaveAll", 1)
   gmsh.open(mshfile)
   
   renumber && gmsh.model.mesh.renumberNodes()
