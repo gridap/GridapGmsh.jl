@@ -3,7 +3,7 @@ const D3=3
 const POINT=15
 const UNSET = 0
 
-function GmshDiscreteModel(mshfile; renumber=false)
+function GmshDiscreteModel(mshfile; renumber=true)
   @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
