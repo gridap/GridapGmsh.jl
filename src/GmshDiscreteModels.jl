@@ -3,7 +3,7 @@ const D3=3
 const POINT=15
 const UNSET = 0
 
-function GmshDiscreteModel(mshfile; renumber=false)
+function GmshDiscreteModel(mshfile; renumber=true)
   @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
@@ -11,6 +11,8 @@ function GmshDiscreteModel(mshfile; renumber=false)
 
   gmsh.initialize()
   gmsh.option.setNumber("General.Terminal", 1)
+  gmsh.option.setNumber("Mesh.SaveAll", 1)
+  gmsh.option.setNumber("Mesh.MedImportGroupsOfNodes", 1)
   gmsh.open(mshfile)
   
   renumber && gmsh.model.mesh.renumberNodes()
