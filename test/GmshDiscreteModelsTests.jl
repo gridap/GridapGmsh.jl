@@ -20,7 +20,7 @@ function check_interpolation(model)
   uh = interpolate(u,V)
   e = u - uh
   Ω = Triangulation(model)
-  dΩ = LebesgueMeasure(Ω,2*order)
+  dΩ = Measure(Ω,2*order)
   @test sum(∫( e*e )dΩ) < 1.0e-9
 end
 

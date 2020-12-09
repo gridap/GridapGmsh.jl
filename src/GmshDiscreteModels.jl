@@ -302,7 +302,7 @@ function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
 
   D = num_cell_dims(grid)
   dim_to_gface_to_nodes, dim_gface_to_entity = _setup_faces(gmsh,D)
-  push!(dim_to_gface_to_nodes,get_cell_nodes(grid))
+  push!(dim_to_gface_to_nodes,get_cell_node_ids(grid))
   push!(dim_gface_to_entity,cell_to_entity)
 
   dim_to_group_to_entities = _setup_dim_to_group_to_entities(gmsh)
