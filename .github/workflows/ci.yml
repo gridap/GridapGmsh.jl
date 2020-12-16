@@ -25,7 +25,7 @@ jobs:
       - run: |
           echo $GMSHROOT
           $GMSHROOT/bin/gmsh --version
-          head $GMSHROOT/bin/gmsh.jl
+          head $GMSHROOT/lib/gmsh.jl
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:
