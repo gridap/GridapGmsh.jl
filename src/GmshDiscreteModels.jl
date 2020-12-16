@@ -79,7 +79,7 @@ function _setup_node_coords(gmsh,D)
 end
 
 function _fill_node_coords!(node_to_coords,nodeTags,coord,D)
-  m = zero(mutable(Point{D,Float64}))
+  m = zero(Mutable(Point{D,Float64}))
   for node in nodeTags
     for j in 1:D
       k = (node-1)*D3 + j
@@ -176,6 +176,8 @@ function  _fill_connectivity!(
     i_to_cell = elemTags[j]
     i_lnode_to_node = nodeTags[j]
     if (nlnodes == d+1)
+      # what we do here has to match with the OrientationStyle we
+      # use when building the UnstructuredGrid
       _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
     elseif (nlnodes == 4)
       _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
@@ -254,7 +256,7 @@ function _setup_reffes(gmsh,d)
   reffe = _reffe_from_etype(etype)
   reffes = [reffe,]
 
-  orientation = Val(is_simplex(get_polytope(reffe)))
+  orientation = is_simplex(get_polytope(reffe)) ? Oriented() : NonOriented()
 
   (cell_to_type, reffes, orientation)
 end
@@ -300,7 +302,7 @@ function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
 
   D = num_cell_dims(grid)
   dim_to_gface_to_nodes, dim_gface_to_entity = _setup_faces(gmsh,D)
-  push!(dim_to_gface_to_nodes,get_cell_nodes(grid))
+  push!(dim_to_gface_to_nodes,get_cell_node_ids(grid))
   push!(dim_gface_to_entity,cell_to_entity)
 
   dim_to_group_to_entities = _setup_dim_to_group_to_entities(gmsh)

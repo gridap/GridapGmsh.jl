@@ -1,0 +1,39 @@
+name: CI
+on:
+  - push
+  - pull_request
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.5'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - run: sudo apt-get install libglu1
+      - run: |
+          curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
+          tar xfv gmsh-4.4.1-Linux64-sdk.tgz
+          GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
+          echo "GMSHROOT=${GMSHROOT}" >> $GITHUB_ENV
+      - run: |
+          echo $GMSHROOT
+          $GMSHROOT/bin/gmsh --version
+          head $GMSHROOT/lib/gmsh.jl
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v1
+        with:
+          file: lcov.info
