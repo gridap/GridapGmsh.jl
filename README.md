@@ -22,26 +22,23 @@ model = GmshDiscreteModel("demo/demo.msh")
 order = 1
 diritags = ["boundary1", "boundary2"]
 
-V = TestFESpace(
-  reffe=:Lagrangian,
-  order=1,
-  valuetype=Float64,
-  model=model,
-  dirichlet_tags=["boundary1","boundary2"])
+reffe = ReferenceFE(lagrangian,Float64,order)
+
+V = TestFESpace(model,reffe,dirichlet_tags=["boundary1","boundary2"])
 
 U = TrialFESpace(V,[0,1])
 
-trian = Triangulation(model)
 degree = 2
-quad = CellQuadrature(trian,degree)
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
 
-a(u,v) = ∇(v)⋅∇(u)
-t_Ω = LinearFETerm(a,trian,quad)
+a(u,v) = ∫( ∇(v)⋅∇(u) )dΩ
+l(v) = 0
 
-op = AffineFEOperator(U,V,t_Ω)
+op = AffineFEOperator(a,l,U,V)
 
 uh = solve(op)
-writevtk(trian,"demo",cellfields=["uh"=>uh])
+writevtk(Ω,"demo",cellfields=["uh"=>uh])
 ```
 
 ![](demo/demo.png)
