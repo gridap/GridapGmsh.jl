@@ -16,8 +16,7 @@ jobs:
         arch:
           - x64
     steps:
-      - run: |
-        sudo apt-get install libglu1
+      - run: sudo apt-get install libglu1
       - run: |
           curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
           tar xfv gmsh-4.4.1-Linux64-sdk.tgz
