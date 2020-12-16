@@ -21,6 +21,9 @@ jobs:
           tar xfv gmsh-4.4.1-Linux64-sdk.tgz
           GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
           echo $GMSHROOT/bin >> $GITHUB_PATH
+      - run: |
+         echo $PATH
+         which gmsh
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:
