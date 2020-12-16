@@ -1,6 +1,6 @@
 # GridapGmsh <img src="https://github.com/gridap/Gridap.jl/blob/master/images/color-logo-only.png" width="40" title="Gridap logo">
 
-[![Build Status](https://travis-ci.com/gridap/GridapGmsh.jl.svg?branch=master)](https://travis-ci.com/gridap/GridapGmsh.jl)
+[![Build Status](https://github.com/gridap/GridapGmsh.jl/workflows/CI/badge.svg?branch=master)](https://github.com/gridap/GridapGmsh.jl/actions?query=workflow%3ACI)
 [![Codecov](https://codecov.io/gh/gridap/GridapGmsh.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/gridap/GridapGmsh.jl)
 
 
