@@ -23,6 +23,7 @@ jobs:
           echo "GMSHROOT=${GMSHROOT}" >> $GITHUB_ENV
       - run: |
           echo $GMSHROOT
+          $GMSHROOT/bin/gmsh --version
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:
