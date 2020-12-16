@@ -16,6 +16,11 @@ jobs:
         arch:
           - x64
     steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
       - run: sudo apt-get install libglu1
       - run: |
           curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
@@ -26,21 +31,6 @@ jobs:
           echo $GMSHROOT
           $GMSHROOT/bin/gmsh --version
           head $GMSHROOT/lib/gmsh.jl
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-      - uses: actions/cache@v1
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
