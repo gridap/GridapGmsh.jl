@@ -17,9 +17,9 @@ jobs:
           - x64
     steps:
       - run: |
-          curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz |
-          tar xfv gmsh-4.4.1-Linux64-sdk.tgz |
-          GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk |
+          curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
+          tar xfv gmsh-4.4.1-Linux64-sdk.tgz
+          GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
           echo $GMSHROOT/bin >> $GITHUB_PATH
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
