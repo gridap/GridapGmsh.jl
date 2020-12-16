@@ -17,6 +17,8 @@ jobs:
           - x64
     steps:
       - run: |
+        sudo apt-get install libglu1
+      - run: |
           curl -OL http://gmsh.info/bin/Linux/gmsh-4.4.1-Linux64-sdk.tgz
           tar xfv gmsh-4.4.1-Linux64-sdk.tgz
           GMSHROOT=`pwd`/gmsh-4.4.1-Linux64-sdk
@@ -24,6 +26,7 @@ jobs:
       - run: |
           echo $GMSHROOT
           $GMSHROOT/bin/gmsh --version
+          head $GMSHROOT/bin/gmsh.jl
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:
