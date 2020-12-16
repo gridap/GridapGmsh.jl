@@ -8,7 +8,7 @@ using Test
 
 function check_interpolation(model)
   order = 2
-  reffe = ReferenceFE(:Lagrangian,Float64,order)
+  reffe = ReferenceFE(lagrangian,Float64,order)
   V = FESpace(model,reffe)
   if num_dims(model) == 2
     u = x -> x[1]^2 + 2*x[2]^2
