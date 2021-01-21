@@ -50,4 +50,8 @@ model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
 check_interpolation(model)
 
+mshfile = joinpath(@__DIR__,"periodic.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+
 end # module

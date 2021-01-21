@@ -19,8 +19,9 @@ function GmshDiscreteModel(mshfile; renumber=true)
   renumber && gmsh.model.mesh.renumberElements()
   
   grid, cell_to_entity = _setup_grid(gmsh)
-  grid_topology = UnstructuredGridTopology(grid)
-  labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
+  cell_to_vertices, vertex_to_node, node_to_vertex = _setup_vertices(gmsh,grid)
+  grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
+  labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
 
   gmsh.finalize()
 
@@ -49,6 +50,54 @@ function _setup_grid(gmsh)
 
   (grid, cell_to_entity)
 
+end
+
+function _setup_vertices(gmsh,grid)
+  cell_to_nodes = get_cell_node_ids(grid)
+  dimTags = gmsh.model.getEntities()
+  if _has_periodic_bcs(gmsh,dimTags)
+    cell_to_vertices, vertex_to_node, node_to_vertex = _setup_vertices_periodic(
+    gmsh,dimTags,cell_to_nodes,num_nodes(grid))
+  else
+    cell_to_vertices = cell_to_nodes
+    vertex_to_node = 1:num_nodes(grid)
+    node_to_vertex = vertex_to_node
+  end
+  cell_to_vertices, vertex_to_node, node_to_vertex
+end
+
+function _has_periodic_bcs(gmsh,dimTags)
+  for (dim,tag) in dimTags
+    tagMaster, nodeTags, = gmsh.model.mesh.getPeriodicNodes(dim,tag)
+    if length(nodeTags) > 0
+      return true
+    end
+  end
+  return false
+end
+
+function _setup_vertices_periodic(gmsh,dimTags,cell_to_nodes,nnodes)
+  # Assumes linear grid
+  node_to_node_master = fill(UNSET,nnodes)
+  _node_to_node_master!(node_to_node_master,gmsh,dimTags)
+  slave_to_node_slave = findall(node_to_node_master .!= UNSET)
+  slave_to_node_master = node_to_node_master[slave_to_node_slave]
+  node_to_vertex = fill(UNSET,nnodes)
+  vertex_to_node = findall(node_to_node_master .== UNSET)
+  node_to_vertex[vertex_to_node] = 1:length(vertex_to_node)
+  node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
+  cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
+  node_to_vertex[slave_to_node_slave] .= UNSET
+  cell_to_vertices, vertex_to_node, node_to_vertex
+end
+
+function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
+  for (dim,tag) in dimTags
+    tagMaster, nodeTags, nodeTagsMaster, = gmsh.model.mesh.getPeriodicNodes(dim,tag)
+    if length(nodeTags) > 0
+      node_to_node_master[nodeTags] .= nodeTagsMaster
+    end
+  end
 end
 
 function _setup_dim(gmsh)
@@ -298,7 +347,7 @@ function _fill_cell_to_entity!(cell_to_entity,elemTags,entity,o)
   end
 end
 
-function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
+function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
 
   D = num_cell_dims(grid)
   dim_to_gface_to_nodes, dim_gface_to_entity = _setup_faces(gmsh,D)
@@ -313,6 +362,8 @@ function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity)
   node_to_label = _setup_node_to_label(gmsh,dim_to_offset,nnodes)
 
   labeling = _setup_face_labels(
+    vertex_to_node,
+    node_to_vertex,
     grid_topology,
     dim_to_gface_to_nodes,
     dim_gface_to_entity,
@@ -405,6 +456,8 @@ function _setup_node_to_label(gmsh,dim_to_offset,nnodes)
 end
 
 function _setup_face_labels(
+  vertex_to_node,
+  node_to_vertex,
   grid_topology,
   dim_to_gface_to_nodes,
   dim_gface_to_entity,
@@ -413,9 +466,11 @@ function _setup_face_labels(
   dim_to_group_to_name,
   node_to_label)
 
+  vertex_to_label = node_to_label[vertex_to_node]
+
   D = num_cell_dims(grid_topology)
 
-  dim_to_face_to_label = [node_to_label,]
+  dim_to_face_to_label = [vertex_to_label,]
 
   for d in 1:D
     z = fill(UNSET,num_faces(grid_topology,d))
@@ -423,6 +478,7 @@ function _setup_face_labels(
   end
 
   _fill_dim_to_face_to_label!(
+    node_to_vertex,
     dim_to_face_to_label,
     grid_topology,
     dim_to_gface_to_nodes,
@@ -439,6 +495,7 @@ function _setup_face_labels(
 end
 
 function _fill_dim_to_face_to_label!(
+  node_to_vertex,
   dim_to_face_to_label,
   grid_topology,
   dim_to_gface_to_nodes,
@@ -458,6 +515,7 @@ function _fill_dim_to_face_to_label!(
     face_to_nodes = get_faces(grid_topology,d,0)
     node_to_faces = get_faces(grid_topology,0,d)
     gface_to_face = _setup_gface_to_face(
+      node_to_vertex,
       face_to_nodes,
       node_to_faces,
       gface_to_nodes)
@@ -492,16 +550,20 @@ function _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,of
   for gface in 1:ngfaces
     entity = gface_to_entity[gface]
     face = gface_to_face[gface]
-    face_to_label[face] = entity+offset
+    if face != UNSET
+      face_to_label[face] = entity+offset
+    end
   end
 end
 
 function _setup_gface_to_face(
+  node_to_vertex,
   face_to_nodes,
   node_to_faces,
   gface_to_nodes)
 
   gface_to_face = _find_gface_to_face(
+    node_to_vertex,
     face_to_nodes.data,
     face_to_nodes.ptrs,
     node_to_faces.data,
@@ -514,6 +576,7 @@ function _setup_gface_to_face(
 end
 
 function _find_gface_to_face(
+  node_to_vertex,
   face_to_nodes_data,
   face_to_nodes_ptrs,
   node_to_faces_data::AbstractVector{T},
@@ -522,13 +585,14 @@ function _find_gface_to_face(
   gface_to_nodes_ptrs) where T
 
   ngfaces = length(gface_to_nodes_ptrs) - 1
-  gface_to_face = zeros(T,ngfaces)
+  gface_to_face = fill(T(UNSET),ngfaces)
   n = max_cells_arround_vertex(node_to_faces_ptrs)
   faces_around = fill(UNSET,n)
   faces_around_scratch = fill(UNSET,n)
 
   _fill_gface_to_face!(
     gface_to_face,
+    node_to_vertex,
     face_to_nodes_data,
     face_to_nodes_ptrs,
     node_to_faces_data,
@@ -544,6 +608,7 @@ end
 
 function  _fill_gface_to_face!(
   gface_to_face,
+  node_to_vertex,
   face_to_nodes_data,
   face_to_nodes_ptrs,
   node_to_faces_data,
@@ -564,18 +629,32 @@ function  _fill_gface_to_face!(
     b = gface_to_nodes_ptrs[gface+1]
     nlnodes = b-(a+1)
 
+    compute_face = true
     for lnode in 1:nlnodes
       node = gface_to_nodes_data[lnode+a]
+      vertex = node_to_vertex[node]
+      if vertex == UNSET
+        compute_face = false
+        break
+      end
+    end
+    if ! compute_face
+      continue
+    end
+
+    for lnode in 1:nlnodes
+      node = gface_to_nodes_data[lnode+a]
+      vertex = node_to_vertex[node]
       if lnode == 1
         nfaces_around = _fill_cells_around_scratch!(
           faces_around,
-          node,
+          vertex,
           node_to_faces_data,
           node_to_faces_ptrs)
       else
         nfaces_around_scratch = _fill_cells_around_scratch!(
           faces_around_scratch,
-          node,
+          vertex,
           node_to_faces_data,
           node_to_faces_ptrs)
         _set_intersection!(
