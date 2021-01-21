@@ -6,25 +6,12 @@ if haskey(ENV,"GMSHROOT") && !isempty(ENV["GMSHROOT"])
   Using the gmsh installation found via the GMSHROOT environment variable.
   GMSHROOT=$gmsh_root"""
 else
-  gmsh = Sys.which("gmsh")
-  if gmsh === nothing
-    s = """
-    The automatic discovery of a gmsh installation failed.
-    Try one of the following:
-
-    - Install gmsh and make sure that the gmsh executable
-      can be found via the PATH environment variable.
-
-    - Set an environemnt variable called GMSHROOT with the path 
-    to the location of a gmsh installation. Make sure that:
-      GMSHROOT/bin/gmsh is the path of the gmsh binary and
-      GMSHROOT/lib/gmsh.jl is the path of the gmsh Julia API.
-    """
-    @warn s
-  else
-    gmsh_root = dirname(gmsh)[1:end-4]
+  using gmsh_jll
+  GMSH_FOUND = gmsh_jll.is_available()
+  if GMSH_FOUND
+    gmsh_root = gmsh_jll.artifact_dir
     @info """
-    Using the gmsh installation automatically found in $gmsh_root"""
+    Using the gmsh installation installed via BinaryBuilder."""
   end
 end
 

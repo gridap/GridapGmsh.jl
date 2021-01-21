@@ -38,11 +38,11 @@ pkg> add GridapGmsh
 ```
 ## Installation requirements
 
-`GridapGmsh` requires a working instalation of the GMSH Software Development Kit (SDK) available at [gmsh.info](https://gmsh.info/). There are two possible ways of helping `GridapGmsh` to find the GMSH installation.
+`GridapGmsh` requires [GMSH](https://gmsh.info/). There are two possible ways to install GMSH:
 
-- [Recommended] Set an environment variable called `GMSHROOT` containing the path to the location of the root folder of a GMSH installation. Make sure that: `$GMSHROOT/bin/gmsh` is the path of the GMSH binary and `$GMSHROOT/lib/gmsh.jl` is the path of the GMSH Julia API.
+- [Recommended] Do nothing. `GridapGmsh` will download a GMSH binary via [BinaryBuilder](https://github.com/JuliaBinaryWrappers/gmsh_jll.jl).
 
-- Add the folder containing the GMSH binary to the `PATH`. This option will be ignored if the environment variable `GMSHROOT` is present. 
+- Set an environment variable called `GMSHROOT` containing the path to the location of the root folder of a GMSH installation. The GMSH Software Development Kit (SDK) available at [gmsh.info](https://gmsh.info/). Make sure that: `$GMSHROOT/bin/gmsh` is the path of the GMSH binary and `$GMSHROOT/lib/gmsh.jl` is the path of the GMSH Julia API.
 
 ## Gotchas
 
