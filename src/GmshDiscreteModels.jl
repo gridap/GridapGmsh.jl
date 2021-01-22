@@ -87,7 +87,6 @@ function _setup_vertices_periodic(gmsh,dimTags,cell_to_nodes,nnodes)
   node_to_vertex[vertex_to_node] = 1:length(vertex_to_node)
   node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
   cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
-  node_to_vertex[slave_to_node_slave] .= UNSET
   cell_to_vertices, vertex_to_node, node_to_vertex
 end
 
@@ -550,9 +549,7 @@ function _apply_offset_for_faces!(face_to_label,gface_to_entity,gface_to_face,of
   for gface in 1:ngfaces
     entity = gface_to_entity[gface]
     face = gface_to_face[gface]
-    if face != UNSET
-      face_to_label[face] = entity+offset
-    end
+    face_to_label[face] = entity+offset
   end
 end
 
@@ -628,19 +625,6 @@ function  _fill_gface_to_face!(
     a = gface_to_nodes_ptrs[gface]-1
     b = gface_to_nodes_ptrs[gface+1]
     nlnodes = b-(a+1)
-
-    compute_face = true
-    for lnode in 1:nlnodes
-      node = gface_to_nodes_data[lnode+a]
-      vertex = node_to_vertex[node]
-      if vertex == UNSET
-        compute_face = false
-        break
-      end
-    end
-    if ! compute_face
-      continue
-    end
 
     for lnode in 1:nlnodes
       node = gface_to_nodes_data[lnode+a]
