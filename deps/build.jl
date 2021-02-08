@@ -17,7 +17,8 @@ end
 
 GMSH_FOUND = false
 if gmsh_root != nothing
-  gmsh_bin = joinpath(gmsh_root,"bin","gmsh")
+  gmsh_bin = (Sys.iswindows() ? joinpath(gmsh_root,"bin","gmsh.exe") : 
+              joinpath(gmsh_root,"bin","gmsh"))
   if isfile(gmsh_bin)
     GMSH_FOUND = true
     @info "gmsh binary found in $gmsh_bin"
