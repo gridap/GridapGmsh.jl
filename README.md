@@ -38,13 +38,11 @@ pkg> add GridapGmsh
 ```
 ## Installation requirements
 
-`GridapGmsh` requires [GMSH](https://gmsh.info/). There are two possible ways to install GMSH:
+`GridapGmsh` requires [GMSH](https://gmsh.info/). There are two possible ways to install the GMSH dependency:
 
-> Note: **Windows (Windows 10) systems** at the moment is not working with the gmsh_jll automated build out of the box. Therefore, for Windows 10 **only the second option** described bellow will work properly.
+1. [Recommended] Do nothing (automatically installation). `GridapGmsh` will download a GMSH binary via [BinaryBuilder](https://github.com/JuliaBinaryWrappers/gmsh_jll.jl), which then is installed to your `~/.julia/artifacts` directory, this should work fine in the most cases.
 
-1. [Recommended UNIX] Do nothing. `GridapGmsh` will download a GMSH binary via [BinaryBuilder](https://github.com/JuliaBinaryWrappers/gmsh_jll.jl).
-
-2. [Recommended Windows] Set an environment variable called `GMSHROOT` containing the path to the location of the root folder of a GMSH installation. The GMSH Software Development Kit (SDK) available at [gmsh.info](https://gmsh.info/). Make sure that: `$GMSHROOT/bin/gmsh` is the path of the GMSH binary and `$GMSHROOT/lib/gmsh.jl` is the path of the GMSH Julia API.
+2. [Fallback] Set an environment variable called `GMSHROOT` containing the path to the location of the root folder of a GMSH-SDK installation. The GMSH Software Development Kit (SDK) available at [gmsh.info](https://gmsh.info/). Make sure that: `$GMSHROOT/bin/gmsh` is the path of the GMSH binary and `$GMSHROOT/lib/gmsh.jl` is the path of the GMSH Julia API.
 
 ## Gotchas
 
