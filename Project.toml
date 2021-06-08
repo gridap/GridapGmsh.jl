@@ -1,7 +1,7 @@
 name = "GridapGmsh"
 uuid = "3025c34a-b394-11e9-2a55-3fee550c04c8"
 authors = ["Francesc Verdugo <fverdugo@cimne.upc.edu>"]
-version = "0.5.0"
+version = "0.4.2"
 
 [deps]
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
@@ -9,7 +9,7 @@ Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 gmsh_jll = "630162c2-fc9b-58b3-9910-8442a8a132e6"
 
 [compat]
-Gridap = "0.16.1"
+Gridap = "0.15, 0.16.1"
 gmsh_jll = "4.7.1"
 julia = "1.3"
 
