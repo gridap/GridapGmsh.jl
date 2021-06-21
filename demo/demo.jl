@@ -1,30 +1,24 @@
-
 using Gridap
 using GridapGmsh
 
 model = GmshDiscreteModel("demo/demo.msh")
 
 order = 1
-diritags = ["boundary1", "boundary2"]
-fespace = ConformingFESpace(Float64,model,order,diritags)
+dirichlet_tags = ["boundary1","boundary2"]
+u_boundary1(x) = 0.0
+u_boundary2(x) = 1.0
 
-ufun1(x) = 0.0
-ufun2(x) = 1.0
-V = TestFESpace(fespace)
-U = TrialFESpace(fespace,[ufun1,ufun2])
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(model,reffe,dirichlet_tags=dirichlet_tags)
+U = TrialFESpace(V,[u_boundary1,u_boundary2])
 
-trian = Triangulation(model)
-quad = CellQuadrature(trian,order=2)
+Ω = Triangulation(model)
+dΩ = Measure(Ω,2*order)
 
-a(v,u) = inner(∇(v), ∇(u))
-t_Ω = LinearFETerm(a,trian,quad)
+a(u,v) = ∫( ∇(u)⋅∇(v) )dΩ
+l(v) = 0
 
-assem = SparseMatrixAssembler(V,U)
+op = AffineFEOperator(a,l,U,V)
+uh = solve(op)
 
-op = LinearFEOperator(V,U,assem,t_Ω)
-
-ls = LUSolver()
-solver = LinearFESolver(ls)
-
-uh = solve(solver,op)
-writevtk(trian,"demo",cellfields=["uh"=>uh])
+writevtk(Ω,"demo",cellfields=["uh"=>uh])
