@@ -730,3 +730,27 @@ function _setup_tag_to_labels(
   tag_to_labels
 
 end
+
+## Parallel related
+
+function GmshDiscreteModel(
+  parts::PArrays.AbstractPData,
+  args...;kwargs...)
+
+  GmshDiscreteModel(
+    Metis.partition,
+    parts,
+    args...;kwargs...)
+end
+
+function GmshDiscreteModel(
+  do_partition,
+  parts::PArrays.AbstractPData,
+  args...;kwargs...)
+
+  smodel = GmshDiscreteModel(args...;kwargs...)
+  g = GridapDistributed.compute_cell_graph(smodel)
+  np = length(parts)
+  cell_to_part = do_partition(g,np)
+  DiscreteModel(parts,smodel,cell_to_part,g)
+end

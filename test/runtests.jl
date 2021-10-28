@@ -11,6 +11,10 @@ if GridapGmsh.GMSH_FOUND
   @testset "GmshDiscreteModel" begin
    include("GmshDiscreteModelsTests.jl")
   end
+
+  @testset "Distributed" begin
+   include("DistributedTests.jl")
+  end
 else
   @warn "GridapGmsh is not loaded or installed properly."
 end
