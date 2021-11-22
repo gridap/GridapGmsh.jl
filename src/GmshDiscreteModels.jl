@@ -14,10 +14,10 @@ function GmshDiscreteModel(mshfile; renumber=true)
   gmsh.option.setNumber("Mesh.SaveAll", 1)
   gmsh.option.setNumber("Mesh.MedImportGroupsOfNodes", 1)
   gmsh.open(mshfile)
-  
+
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
-  
+
   grid, cell_to_entity = _setup_grid(gmsh)
   cell_to_vertices, vertex_to_node, node_to_vertex = _setup_vertices(gmsh,grid)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
@@ -30,26 +30,57 @@ end
 
 function _setup_grid(gmsh)
 
-  D = _setup_dim(gmsh)
+  Dc = _setup_cell_dim(gmsh)
+  Dp = _setup_point_dim(gmsh,Dc)
 
-  node_to_coords = _setup_node_coords(gmsh,D)
+  if Dp == 3 && Dc == 2
+    orient_if_simplex = false
+  else
+    orient_if_simplex = true
+  end
 
-  cell_to_nodes, nminD = _setup_connectivity(gmsh,D)
+  node_to_coords = _setup_node_coords(gmsh,Dp)
 
-  cell_to_type, reffes, orientation = _setup_reffes(gmsh,D)
+  cell_to_nodes, nminD = _setup_connectivity(gmsh,Dc,orient_if_simplex)
+
+  cell_to_type, reffes, orientation = _setup_reffes(gmsh,Dc,orient_if_simplex)
 
   cell_to_entity = _setup_cell_to_entity(
-    gmsh,D,length(cell_to_nodes),nminD)
+    gmsh,Dc,length(cell_to_nodes),nminD)
+
+  if Dp == 3 && Dc == 2
+    cell_coords = lazy_map(Broadcasting(Reindex(node_to_coords)),cell_to_nodes)
+    ctype_shapefuns = map(get_shapefuns,reffes)
+    cell_shapefuns = expand_cell_data(ctype_shapefuns,cell_to_type)
+    cell_map = lazy_map(linear_combination,cell_coords,cell_shapefuns)
+    ctype_x = fill(zero(VectorValue{Dc,Float64}),length(ctype_shapefuns))
+    cell_x = expand_cell_data(ctype_x,cell_to_type)
+    cell_Jt = lazy_map(∇,cell_map)
+    cell_n = lazy_map(Operation(_unit_outward_normal),cell_Jt)
+    cell_nx = lazy_map(evaluate,cell_n,cell_x) |> collect
+    facet_normal = lazy_map(constant_field,cell_nx)
+  else
+    facet_normal = nothing
+  end
 
   grid = UnstructuredGrid(
     node_to_coords,
     cell_to_nodes,
     reffes,
     cell_to_type,
-    orientation)
+    orientation,
+    facet_normal)
 
   (grid, cell_to_entity)
 
+end
+
+function _unit_outward_normal(v::MultiValue{Tuple{2,3}})
+  n1 = v[1,2]*v[2,3] - v[1,3]*v[2,2]
+  n2 = v[1,3]*v[2,1] - v[1,1]*v[2,3]
+  n3 = v[1,1]*v[2,2] - v[1,2]*v[2,1]
+  n = VectorValue(n1,n2,n3)
+  n/norm(n)
 end
 
 function _setup_vertices(gmsh,grid)
@@ -99,7 +130,7 @@ function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
   end
 end
 
-function _setup_dim(gmsh)
+function _setup_cell_dim(gmsh)
   entities = gmsh.model.getEntities()
   D = -1
   for e in entities
@@ -110,6 +141,22 @@ function _setup_dim(gmsh)
     error("No entities in the msh file.")
   end
   D
+end
+
+function _setup_point_dim(gmsh,Dc)
+  if Dc == D3
+    return Dc
+  end
+  nodeTags, coord, parametricCoord = gmsh.model.mesh.getNodes()
+  for node in nodeTags
+    j = D3
+    k = (node-1)*D3 + j
+    xj = coord[k]
+    if !(xj + 1 ≈ 1)
+      return D3
+    end
+  end
+  Dc
 end
 
 function _setup_node_coords(gmsh,D)
@@ -138,7 +185,7 @@ function _fill_node_coords!(node_to_coords,nodeTags,coord,D)
   end
 end
 
-function _setup_connectivity(gmsh,d)
+function _setup_connectivity(gmsh,d,orient_if_simplex)
 
   elemTypes, elemTags, nodeTags = gmsh.model.mesh.getElements(d)
 
@@ -169,7 +216,8 @@ function _setup_connectivity(gmsh,d)
     elemTypes,
     elemTags,
     nodeTags,
-    d)
+    d,
+    orient_if_simplex)
 
   cell_to_nodes = Table(cell_to_nodes_data,cell_to_nodes_prts)
 
@@ -207,7 +255,8 @@ function  _fill_connectivity!(
     elemTypes,
     elemTags,
     nodeTags,
-    d)
+    d,
+    orient_if_simplex)
 
   for (j,etype) in enumerate(elemTypes)
     nlnodes = etype_to_nlnodes[etype]
@@ -223,7 +272,7 @@ function  _fill_connectivity!(
     nlnodes = etype_to_nlnodes[etype]
     i_to_cell = elemTags[j]
     i_lnode_to_node = nodeTags[j]
-    if (nlnodes == d+1)
+    if (nlnodes == d+1) && orient_if_simplex
       # what we do here has to match with the OrientationStyle we
       # use when building the UnstructuredGrid
       _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
@@ -273,7 +322,7 @@ function _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
   end
 end
 
-function _setup_reffes(gmsh,d)
+function _setup_reffes(gmsh,d,orient_if_simplex)
 
   elemTypes, elemTags, nodeTags = gmsh.model.mesh.getElements(d)
 
@@ -304,7 +353,9 @@ function _setup_reffes(gmsh,d)
   reffe = _reffe_from_etype(etype)
   reffes = [reffe,]
 
-  orientation = is_simplex(get_polytope(reffe)) ? Oriented() : NonOriented()
+  boo = is_simplex(get_polytope(reffe)) && orient_if_simplex
+
+  orientation = boo ? Oriented() : NonOriented()
 
   (cell_to_type, reffes, orientation)
 end
@@ -379,7 +430,8 @@ function _setup_faces(gmsh,D)
   dim_to_gface_to_nodes = []
   dim_gface_to_entity = []
   for d in 0:(D-1)
-    face_to_nodes, nmin  = _setup_connectivity(gmsh,d)
+    orient_if_simplex = true
+    face_to_nodes, nmin  = _setup_connectivity(gmsh,d,orient_if_simplex)
     face_to_entity = _setup_cell_to_entity(gmsh,d,length(face_to_nodes),nmin)
     push!(dim_to_gface_to_nodes,face_to_nodes)
     push!(dim_gface_to_entity,face_to_entity)
