@@ -59,21 +59,17 @@ function _setup_grid(gmsh)
     cell_n = lazy_map(Operation(_unit_outward_normal),cell_Jt)
     cell_nx = lazy_map(evaluate,cell_n,cell_x) |> collect
     facet_normal = lazy_map(constant_field,cell_nx)
-    grid = UnstructuredGrid(
-      node_to_coords,
-      cell_to_nodes,
-      reffes,
-      cell_to_type,
-      orientation,
-      facet_normal)
   else
-    grid = UnstructuredGrid(
-      node_to_coords,
-      cell_to_nodes,
-      reffes,
-      cell_to_type,
-      orientation)
+    facet_normal = nothing
   end
+
+  grid = UnstructuredGrid(
+    node_to_coords,
+    cell_to_nodes,
+    reffes,
+    cell_to_type,
+    orientation,
+    facet_normal)
 
   (grid, cell_to_entity)
 
