@@ -785,14 +785,14 @@ end
 
 ## Parallel related
 
-function GmshDiscreteModel(
-  parts::PArrays.AbstractPData,
-  args...;kwargs...)
-
-  GmshDiscreteModel(
-    Metis.partition,
-    parts,
-    args...;kwargs...)
+function GmshDiscreteModel(parts::PArrays.AbstractPData, args...;kwargs...)
+  GmshDiscreteModel(parts,args...;kwargs...) do g,np
+    if np == 1
+      fill(Int32(1),size(g,1))
+    else
+      Metis.partition(g,np)
+    end
+  end
 end
 
 function GmshDiscreteModel(
@@ -805,4 +805,9 @@ function GmshDiscreteModel(
   np = length(parts)
   cell_to_part = do_partition(g,np)
   DiscreteModel(parts,smodel,cell_to_part,g)
+end
+
+# Native serial Gridap if not parts given
+function GmshDiscreteModel(parts::Nothing, args...;kwargs...)
+  GmshDiscreteModel(args...;kwargs...)
 end
