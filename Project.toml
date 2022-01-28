@@ -1,7 +1,7 @@
 name = "GridapGmsh"
 uuid = "3025c34a-b394-11e9-2a55-3fee550c04c8"
 authors = ["Francesc Verdugo <fverdugo@cimne.upc.edu>"]
-version = "0.5.0"
+version = "0.6.0"
 
 [deps]
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
