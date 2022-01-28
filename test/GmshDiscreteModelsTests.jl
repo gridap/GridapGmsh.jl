@@ -50,6 +50,18 @@ model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
 check_interpolation(model)
 
+mshfile = joinpath(@__DIR__,"plane.msh")
+model = GmshDiscreteModel(mshfile)
+grid = get_grid(model)
+@test num_cell_dims(grid) == 2
+@test num_point_dims(grid) == 3
+Ω = Triangulation(model)
+n_Ω = get_normal_vector(Ω)
+x_Ω = get_cell_points(Ω)
+collect(n_Ω(x_Ω))
+test_discrete_model(model)
+check_interpolation(model)
+
 mshfile = joinpath(@__DIR__,"periodic.msh")
 model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
