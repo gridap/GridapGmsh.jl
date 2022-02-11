@@ -782,3 +782,32 @@ function _setup_tag_to_labels(
   tag_to_labels
 
 end
+
+## Parallel related
+
+function GmshDiscreteModel(parts::PArrays.AbstractPData, args...;kwargs...)
+  GmshDiscreteModel(parts,args...;kwargs...) do g,np
+    if np == 1
+      fill(Int32(1),size(g,1))
+    else
+      Metis.partition(g,np)
+    end
+  end
+end
+
+function GmshDiscreteModel(
+  do_partition,
+  parts::PArrays.AbstractPData,
+  args...;kwargs...)
+
+  smodel = GmshDiscreteModel(args...;kwargs...)
+  g = GridapDistributed.compute_cell_graph(smodel)
+  np = length(parts)
+  cell_to_part = do_partition(g,np)
+  DiscreteModel(parts,smodel,cell_to_part,g)
+end
+
+# Native serial Gridap if not parts given
+function GmshDiscreteModel(parts::Nothing, args...;kwargs...)
+  GmshDiscreteModel(args...;kwargs...)
+end

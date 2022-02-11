@@ -11,6 +11,11 @@ using Gridap.Geometry: max_cells_arround_vertex
 using Gridap.Geometry: _fill_cells_around_scratch!
 using Gridap.Geometry: _set_intersection!
 
+import Metis
+import GridapDistributed
+import PartitionedArrays
+const PArrays = PartitionedArrays
+
 export GmshDiscreteModel
 
 
