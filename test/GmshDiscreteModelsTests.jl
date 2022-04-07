@@ -81,4 +81,8 @@ uh = solve(op)
 #writevtk(Ω,"sol",cellfields=["uh"=>uh,"u"=>u,"e"=>u-uh,"zh"=>zero(U)])
 @test sum( ∫(abs2(u - uh))dΩ ) < 1.0e-9
 
+mshfile = joinpath(@__DIR__,"full_periodic.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+
 end # module
