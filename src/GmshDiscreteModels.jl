@@ -18,20 +18,56 @@ function GmshDiscreteModel(mshfile; renumber=true)
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
 
-  grid, cell_to_entity = _setup_grid(gmsh)
-  cell_to_vertices, vertex_to_node, node_to_vertex = _setup_vertices(gmsh,grid)
+  Dc = _setup_cell_dim(gmsh)
+  Dp = _setup_point_dim(gmsh,Dc)
+  node_to_coords = _setup_node_coords(gmsh,Dp)
+  nnodes = length(node_to_coords)
+  vertex_to_node, node_to_vertex = _setup_nodes_and_vertices(gmsh,node_to_coords)
+  grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
+  cell_to_vertices = _setup_cell_to_vertices(get_cell_node_ids(grid),node_to_vertex,nnodes)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
-
   gmsh.finalize()
 
   UnstructuredDiscreteModel(grid,grid_topology,labeling)
 end
 
-function _setup_grid(gmsh)
+function  _setup_nodes_and_vertices(gmsh,node_to_coords)
+  nnodes = length(node_to_coords)
+  dimTags = gmsh.model.getEntities()
+  if _has_periodic_bcs(gmsh,dimTags)
+    dimTags = gmsh.model.getEntities()
+    vertex_to_node, node_to_vertex = _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
+  else
+    vertex_to_node = 1:nnodes
+    node_to_vertex = vertex_to_node
+  end
+  vertex_to_node, node_to_vertex
+end
 
-  Dc = _setup_cell_dim(gmsh)
-  Dp = _setup_point_dim(gmsh,Dc)
+function _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
+  # Assumes linear grid
+  node_to_node_master = fill(UNSET,nnodes)
+  _node_to_node_master!(node_to_node_master,gmsh,dimTags)
+  slave_to_node_slave = findall(node_to_node_master .!= UNSET)
+  slave_to_node_master = node_to_node_master[slave_to_node_slave]
+  node_to_vertex = fill(UNSET,nnodes)
+  vertex_to_node = findall(node_to_node_master .== UNSET)
+  node_to_vertex[vertex_to_node] = 1:length(vertex_to_node)
+  nmax = 20
+  for i in 1:nmax
+    node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
+    if all(j->j!=0,node_to_vertex)
+      break
+    end
+    if i == nmax
+      @unreachable
+    end
+  end
+  vertex_to_node, node_to_vertex
+end
+
+function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
 
   if Dp == 3 && Dc == 2
     orient_if_simplex = false
@@ -39,12 +75,8 @@ function _setup_grid(gmsh)
     orient_if_simplex = true
   end
 
-  node_to_coords = _setup_node_coords(gmsh,Dp)
-
-  cell_to_nodes, nminD = _setup_connectivity(gmsh,Dc,orient_if_simplex)
-
+  cell_to_nodes, nminD = _setup_connectivity(gmsh,Dc,node_to_vertex,orient_if_simplex)
   cell_to_type, reffes, orientation = _setup_reffes(gmsh,Dc,orient_if_simplex)
-
   cell_to_entity = _setup_cell_to_entity(
     gmsh,Dc,length(cell_to_nodes),nminD)
 
@@ -83,18 +115,14 @@ function _unit_outward_normal(v::MultiValue{Tuple{2,3}})
   n/norm(n)
 end
 
-function _setup_vertices(gmsh,grid)
-  cell_to_nodes = get_cell_node_ids(grid)
-  dimTags = gmsh.model.getEntities()
-  if _has_periodic_bcs(gmsh,dimTags)
-    cell_to_vertices, vertex_to_node, node_to_vertex = _setup_vertices_periodic(
-    gmsh,dimTags,cell_to_nodes,num_nodes(grid))
+function _setup_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
+  if isa(node_to_vertex,AbstractVector)
+    cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
   else
+    @assert node_to_vertex == 1:nnodes
     cell_to_vertices = cell_to_nodes
-    vertex_to_node = 1:num_nodes(grid)
-    node_to_vertex = vertex_to_node
   end
-  cell_to_vertices, vertex_to_node, node_to_vertex
+  cell_to_vertices
 end
 
 function _has_periodic_bcs(gmsh,dimTags)
@@ -105,29 +133,6 @@ function _has_periodic_bcs(gmsh,dimTags)
     end
   end
   return false
-end
-
-function _setup_vertices_periodic(gmsh,dimTags,cell_to_nodes,nnodes)
-  # Assumes linear grid
-  node_to_node_master = fill(UNSET,nnodes)
-  _node_to_node_master!(node_to_node_master,gmsh,dimTags)
-  slave_to_node_slave = findall(node_to_node_master .!= UNSET)
-  slave_to_node_master = node_to_node_master[slave_to_node_slave]
-  node_to_vertex = fill(UNSET,nnodes)
-  vertex_to_node = findall(node_to_node_master .== UNSET)
-  node_to_vertex[vertex_to_node] = 1:length(vertex_to_node)
-  nmax = 20
-  for i in 1:nmax
-    node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
-    if all(j->j!=0,node_to_vertex)
-      break
-    end
-    if i == nmax
-      @unreachable
-    end
-  end
-  cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
-  cell_to_vertices, vertex_to_node, node_to_vertex
 end
 
 function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
@@ -194,7 +199,7 @@ function _fill_node_coords!(node_to_coords,nodeTags,coord,D)
   end
 end
 
-function _setup_connectivity(gmsh,d,orient_if_simplex)
+function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
 
   elemTypes, elemTags, nodeTags = gmsh.model.mesh.getElements(d)
 
@@ -226,6 +231,7 @@ function _setup_connectivity(gmsh,d,orient_if_simplex)
     elemTags,
     nodeTags,
     d,
+    node_to_vertex,
     orient_if_simplex)
 
   cell_to_nodes = Table(cell_to_nodes_data,cell_to_nodes_prts)
@@ -265,6 +271,7 @@ function  _fill_connectivity!(
     elemTags,
     nodeTags,
     d,
+    node_to_vertex,
     orient_if_simplex)
 
   for (j,etype) in enumerate(elemTypes)
@@ -284,7 +291,7 @@ function  _fill_connectivity!(
     if (nlnodes == d+1) && orient_if_simplex
       # what we do here has to match with the OrientationStyle we
       # use when building the UnstructuredGrid
-      _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
+      _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
     elseif (nlnodes == 4)
       _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
     elseif (nlnodes == 8)
@@ -301,13 +308,14 @@ function  _fill_connectivity!(
 
 end
 
-function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node)
+function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
   aux = zeros(eltype(i_lnode_to_node),nlnodes)
   offset = nlnodes-1
   for i in 1:nlnodes:length(i_lnode_to_node)
-    aux = i_lnode_to_node[i:i+offset]
-    sort!(aux)
-    i_lnode_to_node[i:i+offset] = aux
+    nodes = i_lnode_to_node[i:i+offset]
+    vertices = view(node_to_vertex,nodes)
+    perm = sortperm(vertices)
+    i_lnode_to_node[i:i+offset] = nodes[perm]
   end
 end
 
@@ -409,7 +417,7 @@ end
 function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
 
   D = num_cell_dims(grid)
-  dim_to_gface_to_nodes, dim_gface_to_entity = _setup_faces(gmsh,D)
+  dim_to_gface_to_nodes, dim_gface_to_entity = _setup_faces(gmsh,D,node_to_vertex)
   push!(dim_to_gface_to_nodes,get_cell_node_ids(grid))
   push!(dim_gface_to_entity,cell_to_entity)
 
@@ -435,12 +443,12 @@ function _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,n
 
 end
 
-function _setup_faces(gmsh,D)
+function _setup_faces(gmsh,D,node_to_vertex)
   dim_to_gface_to_nodes = []
   dim_gface_to_entity = []
   for d in 0:(D-1)
     orient_if_simplex = true
-    face_to_nodes, nmin  = _setup_connectivity(gmsh,d,orient_if_simplex)
+    face_to_nodes, nmin  = _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
     face_to_entity = _setup_cell_to_entity(gmsh,d,length(face_to_nodes),nmin)
     push!(dim_to_gface_to_nodes,face_to_nodes)
     push!(dim_gface_to_entity,face_to_entity)
