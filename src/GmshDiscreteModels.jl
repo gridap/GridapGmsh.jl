@@ -116,7 +116,16 @@ function _setup_vertices_periodic(gmsh,dimTags,cell_to_nodes,nnodes)
   node_to_vertex = fill(UNSET,nnodes)
   vertex_to_node = findall(node_to_node_master .== UNSET)
   node_to_vertex[vertex_to_node] = 1:length(vertex_to_node)
-  node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
+  nmax = 20
+  for i in 1:nmax
+    node_to_vertex[slave_to_node_slave] = node_to_vertex[slave_to_node_master]
+    if all(j->j!=0,node_to_vertex)
+      break
+    end
+    if i == nmax
+      @unreachable
+    end
+  end
   cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
   cell_to_vertices, vertex_to_node, node_to_vertex
 end

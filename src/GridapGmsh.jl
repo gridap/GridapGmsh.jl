@@ -2,6 +2,7 @@ module GridapGmsh
 
 using Libdl
 
+using Gridap.Helpers
 using Gridap.Arrays
 using Gridap.TensorValues
 using Gridap.Fields
