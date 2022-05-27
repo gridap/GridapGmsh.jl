@@ -48,6 +48,16 @@ pkg> add GridapGmsh
 
 - Gmsh does not allow to include entities of different dimension in the same physical group. In order to overcome this limitation, all physical groups defined in Gmesh with the same name will be merged in the same physical tag independently of their dimension.
 
+- Conceptually *closed* domains such as circles or sphere-shells may require explicit addition of the technical boundary to the physical group. Example: For a properly functioning 2D disk mesh with labelled circumference write
+```
+SetFactory("OpenCASCADE");
+//+
+Disk(1) = {0, 0, 0, 0.5, 0.5};
+Physical Surface("disk", 3) = {1};
+Physical Curve("boundary", 4) = {1};
+Physical Point("boundary", 5) = {1};
+```
+
 - Vertices are always assigned to the corresponding CAD entity. However, this is not true for higher dimensional objects (i.e., edges, faces, cells). The later objects are associated with the right CAD entity if and only if they are present in a physical group of the same dimension of the object. If the object does not belong to a physical group of the same dimension, but it belongs to the closure of a higher dimensional object appearing in a physical group, then the low dimensional object receives the CAD id of the high dimensional object. If several high dimensional objects fulfill this requirement, we choose one arbitrary of the lowest dimension possible. This ensures, that edges and faces are assigned to the right CAD entity if the are in the interior of the CAD entity. The same is not true if the object is on the boundary of the CAD entity. In this case, include the corresponding object in a physical group if the right CAD ids are required.
 
 ## How to cite Gridap
