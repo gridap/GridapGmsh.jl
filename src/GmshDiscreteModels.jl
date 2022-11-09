@@ -14,7 +14,12 @@ function GmshDiscreteModel(mshfile; renumber=true)
   gmsh.option.setNumber("Mesh.SaveAll", 1)
   gmsh.option.setNumber("Mesh.MedImportGroupsOfNodes", 1)
   gmsh.open(mshfile)
+  model = GmshDiscreteModel(gmsh; renumber)
+  gmsh.finalize()
+  model
+end
 
+function GmshDiscreteModel(gmsh::Module; renumber=true)
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
 
@@ -27,8 +32,6 @@ function GmshDiscreteModel(mshfile; renumber=true)
   cell_to_vertices, vertex_to_node, node_to_vertex = _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
-  gmsh.finalize()
-
   UnstructuredDiscreteModel(grid,grid_topology,labeling)
 end
 
