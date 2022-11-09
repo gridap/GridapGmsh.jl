@@ -145,14 +145,15 @@ function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
 end
 
 function _setup_cell_dim(gmsh)
-  entities = gmsh.model.getEntities()
+  eltypes, = gmsh.model.mesh.getElements()
   D = -1
-  for e in entities
-    D = max(D,e[1])
+  for eltype in eltypes
+    _,dim = gmsh.model.mesh.getElementProperties(eltype)
+    D = max(D,dim)
   end
   if D == -1
     gmsh.finalize()
-    error("No entities in the msh file.")
+    error("No elements in the msh file.")
   end
   D
 end
