@@ -188,11 +188,11 @@ function _setup_node_coords(gmsh,D)
   node_to_coords
 end
 
-function _fill_node_coords!(node_to_coords,nodeTags,coord,D)
+function _fill_node_coords!(node_to_coords,nodeTags,coord,D,Dp=D3)
   m = zero(Mutable(Point{D,Float64}))
   for node in nodeTags
     for j in 1:D
-      k = (node-1)*D3 + j
+      k = (node-1)*Dp + j
       xj = coord[k]
       m[j] = xj
     end
@@ -368,7 +368,7 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
     error("For the moment only for first-order elements")
   end
 
-  reffe = _reffe_from_etype(etype)
+  reffe = _reffe_from_etype(gmsh,etype)
   reffes = [reffe,]
 
   boo = is_simplex(get_polytope(reffe)) && orient_if_simplex
@@ -378,7 +378,7 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
   (cell_to_type, reffes, orientation)
 end
 
-function _reffe_from_etype(eltype)
+function _reffe_from_etype(gmsh,eltype)
   if eltype == 1
     SEG2
   elseif eltype == 2
@@ -392,9 +392,123 @@ function _reffe_from_etype(eltype)
   elseif eltype == POINT
     VERTEX1
   else
-    gmsh.finalize()
-    error("Unsupported element type. elemType: $etype")
+    _lagrangian_reffe_from_etype(gmsh,eltype)
   end
+end
+
+function _polytope_from_etype(gmsh,eltype)
+  name, = gmsh.model.mesh.getElementProperties(eltype)
+  if contains(name,"Point")
+    VERTEX
+  elseif contains(name,"Line")
+    SEGMENT
+  elseif contains(name,"Triangle")
+    TRI
+  elseif contains(name,"Tetrahedron")
+    TET
+  elseif contains(name,"Quadrilateral")
+    QUAD
+  elseif contains(name,"Hexahedron")
+    HEX
+  else
+    gmsh.finalize()
+    error("Unsupported element. $name, elemType: $eltype")
+  end
+end
+
+function _lagrangian_reffe_from_etype(gmsh,eltype)
+  order = _order_from_eltype(gmsh,eltype)
+  polytope = _polytope_from_etype(gmsh,eltype)
+  reffe = LagrangianRefFE(Float64,polytope,order)
+  _check_reffe(gmsh,eltype,reffe)
+  reffe
+end
+
+function _order_from_eltype(gmsh,eltype)
+  _,_,order = gmsh.model.mesh.getElementProperties(eltype)
+  Int(order)
+end
+
+function _check_reffe(gmsh,eltype,reffe)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(eltype)
+  if num_dims(reffe) != dim ||
+     get_order(reffe) != order ||
+     num_nodes(reffe) != nnodes ||
+     num_vertices(get_polytope(reffe)) != nverts
+
+    gmsh.finalize()
+    error("Unsuported element. $name, elemType: $eltype")
+  end
+end
+
+function _setup_etype_to_lnode_to_glnode(gmsh,elemTypes)
+  netypes = maximum(elemTypes)
+  etype_to_glnode_to_lnode_data = Int[]
+  etype_to_glnode_to_lnode_ptrs = zeros(Int,netypes+1)
+  for etype in elemTypes
+    ln_to_gln =_get_lnode_to_glnode(gmsh,etype)
+    append!(etype_to_glnode_to_lnode_data,ln_to_gln)
+    etype_to_glnode_to_lnode_ptrs[etype+1] = length(ln_to_gln)
+  end
+  length_to_ptrs!(etype_to_glnode_to_lnode_ptrs)
+  Table( etype_to_glnode_to_lnode_data, etype_to_glnode_to_lnode_ptrs )
+end
+
+function _get_node_coordinates(gmsh,eltype)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(eltype)
+  dim = Int(dim)
+  node_to_coords = zeros(Point{dim,Float64},nnodes)
+  _fill_node_coords!(node_to_coords,1:nnodes,coords,dim,dim)
+  node_to_coords
+end
+
+function _get_lnode_to_glnode(gmsh,eltype)
+  reffe = _reffe_from_etype(gmsh,eltype)
+  _get_lnode_to_glnode(gmsh,eltype,reffe)
+end
+
+function _get_lnode_to_glnode(gmsh,eltype,reffe::ReferenceFE{0})
+  [1]
+end
+
+function _get_lnode_to_glnode(gmsh,eltype,reffe)
+  order = get_order(reffe)
+  glcoords = _get_node_coordinates(gmsh,eltype)
+  lcoords = get_node_coordinates(reffe)
+  ln_to_gln = _link_equisipaced_coords(lcoords,glcoords,order+1)
+  if length(unique(ln_to_gln)) != length(ln_to_gln)
+    gmsh.finalize()
+    error("Unsuported element. $name, elemType: $eltype")
+  end
+  ln_to_gln
+end
+
+function _link_equisipaced_coords(a,b,n)
+  a_to_int = _integer_coords(a,n)
+  b_to_int = _integer_coords(b,n)
+  int_to_b = Dict(b_to_int.=>1:length(b))
+  map(Reindex(int_to_b),a_to_int)
+end
+
+function _integer_coords(X,n)
+  xmin,xmax = _bounding_box(X)
+  map(X) do x
+    _integer_coords(x,xmin,xmax,n)
+  end
+end
+
+function _integer_coords(x,xmin,xmax,n)
+  f = (x-xmin)./(xmax-xmin) .*n
+  Point( Int.(round.(Tuple(f))) )
+end
+
+function _bounding_box(X)
+  xmin = xmax = X[1]
+  for x in X
+    xmin = min.(xmin,x)
+    xmax = max.(xmax,x)
+  end
+  xmin,xmax
 end
 
 function _setup_cell_to_entity(gmsh,d,ncells,nmin)
