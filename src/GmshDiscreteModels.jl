@@ -24,7 +24,7 @@ function GmshDiscreteModel(mshfile; renumber=true)
   nnodes = length(node_to_coords)
   vertex_to_node, node_to_vertex = _setup_nodes_and_vertices(gmsh,node_to_coords)
   grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
-  cell_to_vertices = _setup_cell_to_vertices(get_cell_node_ids(grid),node_to_vertex,nnodes)
+  cell_to_vertices, vertex_to_node, node_to_vertex = _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
   gmsh.finalize()
@@ -46,7 +46,10 @@ function  _setup_nodes_and_vertices(gmsh,node_to_coords)
 end
 
 function _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
-  # Assumes linear grid
+  if _order_from_dimtags(gmsh,dimTags) != 1
+    gmsh.finalize()
+    error("For the moment only for first-order elements on periodic BCs")
+  end
   node_to_node_master = fill(UNSET,nnodes)
   _node_to_node_master!(node_to_node_master,gmsh,dimTags)
   slave_to_node_slave = findall(node_to_node_master .!= UNSET)
@@ -115,7 +118,22 @@ function _unit_outward_normal(v::MultiValue{Tuple{2,3}})
   n/norm(n)
 end
 
-function _setup_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
+function _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
+  nnodes = num_nodes(grid)
+  reffes = get_reffes(grid)
+  if maximum(get_order,reffes) == 1
+    cell_to_nodes = get_cell_node_ids(grid)
+    cell_to_vertices = #
+      _reindex_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
+  else
+    @assert node_to_vertex == 1:nnodes
+    cell_to_vertices, vertex_to_node, node_to_vertex = #
+      _generate_cell_to_vertices_from_grid(grid)
+  end
+  cell_to_vertices, vertex_to_node, node_to_vertex
+end
+
+function _reindex_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
   if isa(node_to_vertex,AbstractVector)
     cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
   else
@@ -142,6 +160,22 @@ function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
       node_to_node_master[nodeTags] .= nodeTagsMaster
     end
   end
+end
+
+function _order_from_dimtags(gmsh,dimTags)
+  max_order = -1
+  for (dim,tag) in dimTags
+    etypes, = gmsh.model.mesh.get_elements(dim,tag)
+    for etype in etypes
+      order = _order_from_eltype(gmsh,etype)
+      max_order = max(max_order,order)
+    end
+  end
+  if max_order == -1
+    gmsh.finalize()
+    error("No elements found")
+  end
+  max_order
 end
 
 function _setup_cell_dim(gmsh)
@@ -217,6 +251,7 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
   ncells, nmin, nmax = _check_cell_tags(elemTags)
 
   etype_to_nlnodes = _setup_etype_to_nlnodes(elemTypes,gmsh)
+  etype_to_lnode_to_glnode = _setup_etype_to_lnode_to_glnode(elemTypes,gmsh)
 
   ndata = sum([length(t) for t in nodeTags])
 
@@ -228,6 +263,7 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
     cell_to_nodes_prts,
     nmin-1,
     etype_to_nlnodes,
+    etype_to_lnode_to_glnode,
     elemTypes,
     elemTags,
     nodeTags,
@@ -263,11 +299,12 @@ function _setup_etype_to_nlnodes(elemTypes,gmsh)
   etype_to_nlnodes
 end
 
-function  _fill_connectivity!(
+function _fill_connectivity!(
     cell_to_nodes_data,
     cell_to_nodes_prts,
     o,
     etype_to_nlnodes,
+    etype_to_lnode_to_glnode,
     elemTypes,
     elemTags,
     nodeTags,
@@ -285,18 +322,18 @@ function  _fill_connectivity!(
 
   length_to_ptrs!(cell_to_nodes_prts)
 
+  c = array_cache(etype_to_lnode_to_glnode)
   for (j,etype) in enumerate(elemTypes)
     nlnodes = etype_to_nlnodes[etype]
     i_to_cell = elemTags[j]
     i_lnode_to_node = nodeTags[j]
+    glnode_to_lnode = getindex!(c,etype_to_lnode_to_glnode,etype)
     if (nlnodes == d+1) && orient_if_simplex
       # what we do here has to match with the OrientationStyle we
       # use when building the UnstructuredGrid
       _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
-    elseif (nlnodes == 4)
-      _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
-    elseif (nlnodes == 8)
-      _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
+    else
+      _permute_connectivities!(nlnodes,i_lnode_to_node,glnode_to_lnode)
     end
     for (i,cell) in enumerate(i_to_cell)
       a = cell_to_nodes_prts[cell-o]-1
@@ -320,18 +357,7 @@ function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
   end
 end
 
-function _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
-  aux = zero(eltype(i_lnode_to_node))
-  offset = nlnodes-1
-  for i in 1:nlnodes:length(i_lnode_to_node)
-    aux = i_lnode_to_node[i+offset-1]
-    i_lnode_to_node[i+offset-1] = i_lnode_to_node[i+offset]
-    i_lnode_to_node[i+offset] = aux
-  end
-end
-
-function _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
-  perm = [1, 2, 4, 3, 5, 6, 8, 7]
+function _permute_connectivities!(nlnodes,i_lnode_to_node,perm)
   aux = zeros(eltype(i_lnode_to_node),nlnodes)
   offset = nlnodes-1
   for i in 1:nlnodes:length(i_lnode_to_node)
@@ -361,11 +387,6 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
 
   if order == 0 && etype == POINT
     order = 1
-  end
-
-  if order != 1
-    gmsh.finalize()
-    error("For the moment only for first-order elements")
   end
 
   reffe = _reffe_from_etype(gmsh,etype)
@@ -441,7 +462,7 @@ function _check_reffe(gmsh,eltype,reffe)
   end
 end
 
-function _setup_etype_to_lnode_to_glnode(gmsh,elemTypes)
+function _setup_etype_to_lnode_to_glnode(elemTypes,gmsh)
   netypes = maximum(elemTypes)
   etype_to_glnode_to_lnode_data = Int[]
   etype_to_glnode_to_lnode_ptrs = zeros(Int,netypes+1)
@@ -787,7 +808,7 @@ function _find_gface_to_face(
 
 end
 
-function  _fill_gface_to_face!(
+function _fill_gface_to_face!(
   gface_to_face,
   node_to_vertex,
   face_to_nodes_data,
@@ -819,7 +840,7 @@ function  _fill_gface_to_face!(
           vertex,
           node_to_faces_data,
           node_to_faces_ptrs)
-      else
+      elseif vertex != UNSET
         nfaces_around_scratch = _fill_cells_around_scratch!(
           faces_around_scratch,
           vertex,
