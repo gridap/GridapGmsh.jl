@@ -124,7 +124,7 @@ end
 function _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   nnodes = num_nodes(grid)
   reffes = get_reffes(grid)
-  if maximum(get_order,reffes) == 1
+  if minimum(num_dims,reffes) == 0 || maximum(get_order,reffes) == 1
     cell_to_nodes = get_cell_node_ids(grid)
     cell_to_vertices = #
       _reindex_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
