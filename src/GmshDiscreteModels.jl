@@ -168,9 +168,9 @@ end
 function _order_from_dimtags(gmsh,dimTags)
   max_order = -1
   for (dim,tag) in dimTags
-    etypes, = gmsh.model.mesh.get_elements(dim,tag)
-    for etype in etypes
-      order = _order_from_eltype(gmsh,etype)
+    elemTypes, = gmsh.model.mesh.getElements(dim,tag)
+    for etype in elemTypes
+      order = _order_from_etype(gmsh,etype)
       max_order = max(max_order,order)
     end
   end
@@ -182,10 +182,10 @@ function _order_from_dimtags(gmsh,dimTags)
 end
 
 function _setup_cell_dim(gmsh)
-  eltypes, = gmsh.model.mesh.getElements()
+  elemTypes, = gmsh.model.mesh.getElements()
   D = -1
-  for eltype in eltypes
-    _,dim = gmsh.model.mesh.getElementProperties(eltype)
+  for etype in elemTypes
+    _,dim = gmsh.model.mesh.getElementProperties(etype)
     D = max(D,dim)
   end
   if D == -1
@@ -281,8 +281,8 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
 end
 
 function _check_cell_tags(elemTags)
-  nmin::Int = minimum([minimum(t) for t in elemTags])
-  nmax::Int = maximum([maximum(t) for t in elemTags])
+  nmin::Int = minimum( minimum, elemTags )
+  nmax::Int = maximum( maximum, elemTags )
   ncells = sum([length(t) for t in elemTags])
   if !( (nmax-nmin+1) == ncells)
     gmsh.finalize()
@@ -402,26 +402,26 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
   (cell_to_type, reffes, orientation)
 end
 
-function _reffe_from_etype(gmsh,eltype)
-  if eltype == 1
+function _reffe_from_etype(gmsh,etype)
+  if etype == 1
     SEG2
-  elseif eltype == 2
+  elseif etype == 2
     TRI3
-  elseif eltype == 3
+  elseif etype == 3
     QUAD4
-  elseif eltype == 4
+  elseif etype == 4
     TET4
-  elseif eltype == 5
+  elseif etype == 5
     HEX8
-  elseif eltype == POINT
+  elseif etype == POINT
     VERTEX1
   else
-    _lagrangian_reffe_from_etype(gmsh,eltype)
+    _lagrangian_reffe_from_etype(gmsh,etype)
   end
 end
 
-function _polytope_from_etype(gmsh,eltype)
-  name, = gmsh.model.mesh.getElementProperties(eltype)
+function _polytope_from_etype(gmsh,etype)
+  name, = gmsh.model.mesh.getElementProperties(etype)
   if contains(name,"Point")
     VERTEX
   elseif contains(name,"Line")
@@ -436,32 +436,32 @@ function _polytope_from_etype(gmsh,eltype)
     HEX
   else
     gmsh.finalize()
-    error("Unsupported element. $name, elemType: $eltype")
+    error("Unsupported element. $name, elemType: $etype")
   end
 end
 
-function _lagrangian_reffe_from_etype(gmsh,eltype)
-  order = _order_from_eltype(gmsh,eltype)
-  polytope = _polytope_from_etype(gmsh,eltype)
+function _lagrangian_reffe_from_etype(gmsh,etype)
+  order = _order_from_etype(gmsh,etype)
+  polytope = _polytope_from_etype(gmsh,etype)
   reffe = LagrangianRefFE(Float64,polytope,order)
-  _check_reffe(gmsh,eltype,reffe)
+  _check_reffe(gmsh,etype,reffe)
   reffe
 end
 
-function _order_from_eltype(gmsh,eltype)
-  _,_,order = gmsh.model.mesh.getElementProperties(eltype)
+function _order_from_etype(gmsh,etype)
+  _,_,order = gmsh.model.mesh.getElementProperties(etype)
   Int(order)
 end
 
-function _check_reffe(gmsh,eltype,reffe)
-  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(eltype)
+function _check_reffe(gmsh,etype,reffe)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(etype)
   if num_dims(reffe) != dim ||
      get_order(reffe) != order ||
      num_nodes(reffe) != nnodes ||
      num_vertices(get_polytope(reffe)) != nverts
 
     gmsh.finalize()
-    error("Unsuported element. $name, elemType: $eltype")
+    error("Unsuported element. $name, elemType: $etype")
   end
 end
 
@@ -478,31 +478,31 @@ function _setup_etype_to_lnode_to_glnode(elemTypes,gmsh)
   Table( etype_to_glnode_to_lnode_data, etype_to_glnode_to_lnode_ptrs )
 end
 
-function _get_node_coordinates(gmsh,eltype)
-  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(eltype)
+function _get_node_coordinates(gmsh,etype)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(etype)
   dim = Int(dim)
   node_to_coords = zeros(Point{dim,Float64},nnodes)
   _fill_node_coords!(node_to_coords,1:nnodes,coords,dim,dim)
   node_to_coords
 end
 
-function _get_lnode_to_glnode(gmsh,eltype)
-  reffe = _reffe_from_etype(gmsh,eltype)
-  _get_lnode_to_glnode(gmsh,eltype,reffe)
+function _get_lnode_to_glnode(gmsh,etype)
+  reffe = _reffe_from_etype(gmsh,etype)
+  _get_lnode_to_glnode(gmsh,etype,reffe)
 end
 
-function _get_lnode_to_glnode(gmsh,eltype,reffe::ReferenceFE{0})
+function _get_lnode_to_glnode(gmsh,etype,reffe::ReferenceFE{0})
   [1]
 end
 
-function _get_lnode_to_glnode(gmsh,eltype,reffe)
+function _get_lnode_to_glnode(gmsh,etype,reffe)
   order = get_order(reffe)
-  glcoords = _get_node_coordinates(gmsh,eltype)
+  glcoords = _get_node_coordinates(gmsh,etype)
   lcoords = get_node_coordinates(reffe)
   ln_to_gln = _link_equisipaced_coords(lcoords,glcoords,order)
   if length(unique(ln_to_gln)) != length(ln_to_gln)
     gmsh.finalize()
-    error("Unsuported element. $name, elemType: $eltype")
+    error("Unsuported element. $name, elemType: $etype")
   end
   ln_to_gln
 end
