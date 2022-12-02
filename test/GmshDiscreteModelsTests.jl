@@ -84,5 +84,7 @@ uh = solve(op)
 mshfile = joinpath(@__DIR__,"full_periodic.msh")
 model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
+model2 = Gridap.DiscreteModelFromFile(mshfile)
+test_discrete_model(model2)
 
 end # module
