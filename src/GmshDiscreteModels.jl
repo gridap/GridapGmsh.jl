@@ -828,3 +828,7 @@ end
 function GmshDiscreteModel(parts::Nothing, args...;kwargs...)
   GmshDiscreteModel(args...;kwargs...)
 end
+
+function Gridap.DiscreteModelFromFile(filename::AbstractString,::Val{:msh})
+    GmshDiscreteModel(filename)
+end
