@@ -14,15 +14,14 @@ function GmshDiscreteModel(mshfile; renumber=true)
   gmsh.option.setNumber("Mesh.SaveAll", 1)
   gmsh.option.setNumber("Mesh.MedImportGroupsOfNodes", 1)
   gmsh.open(mshfile)
-  model = GmshDiscreteModel(gmsh; renumber)
+  renumber && gmsh.model.mesh.renumberNodes()
+  renumber && gmsh.model.mesh.renumberElements()
+  model = GmshDiscreteModel(gmsh)
   gmsh.finalize()
   model
 end
 
-function GmshDiscreteModel(gmsh::Module; renumber=true)
-  renumber && gmsh.model.mesh.renumberNodes()
-  renumber && gmsh.model.mesh.renumberElements()
-
+function GmshDiscreteModel(gmsh::Module)
   Dc = _setup_cell_dim(gmsh)
   Dp = _setup_point_dim(gmsh,Dc)
   node_to_coords = _setup_node_coords(gmsh,Dp)
