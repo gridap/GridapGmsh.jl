@@ -14,21 +14,23 @@ function GmshDiscreteModel(mshfile; renumber=true)
   gmsh.option.setNumber("Mesh.SaveAll", 1)
   gmsh.option.setNumber("Mesh.MedImportGroupsOfNodes", 1)
   gmsh.open(mshfile)
-
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
+  model = GmshDiscreteModel(gmsh)
+  gmsh.finalize()
+  model
+end
 
+function GmshDiscreteModel(gmsh::Module)
   Dc = _setup_cell_dim(gmsh)
   Dp = _setup_point_dim(gmsh,Dc)
   node_to_coords = _setup_node_coords(gmsh,Dp)
   nnodes = length(node_to_coords)
   vertex_to_node, node_to_vertex = _setup_nodes_and_vertices(gmsh,node_to_coords)
   grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
-  cell_to_vertices = _setup_cell_to_vertices(get_cell_node_ids(grid),node_to_vertex,nnodes)
+  cell_to_vertices, vertex_to_node, node_to_vertex = _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
-  gmsh.finalize()
-
   UnstructuredDiscreteModel(grid,grid_topology,labeling)
 end
 
@@ -46,7 +48,10 @@ function  _setup_nodes_and_vertices(gmsh,node_to_coords)
 end
 
 function _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
-  # Assumes linear grid
+  if _order_from_dimtags(gmsh,dimTags) != 1
+    gmsh.finalize()
+    error("For the moment only for first-order elements on periodic BCs")
+  end
   node_to_node_master = fill(UNSET,nnodes)
   _node_to_node_master!(node_to_node_master,gmsh,dimTags)
   slave_to_node_slave = findall(node_to_node_master .!= UNSET)
@@ -115,7 +120,22 @@ function _unit_outward_normal(v::MultiValue{Tuple{2,3}})
   n/norm(n)
 end
 
-function _setup_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
+function _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
+  nnodes = num_nodes(grid)
+  reffes = get_reffes(grid)
+  if minimum(num_dims,reffes) == 0 || maximum(get_order,reffes) == 1
+    cell_to_nodes = get_cell_node_ids(grid)
+    cell_to_vertices = #
+      _reindex_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
+  else
+    @assert node_to_vertex == 1:nnodes
+    cell_to_vertices, vertex_to_node, node_to_vertex = #
+      _generate_cell_to_vertices_from_grid(grid)
+  end
+  cell_to_vertices, vertex_to_node, node_to_vertex
+end
+
+function _reindex_cell_to_vertices(cell_to_nodes,node_to_vertex,nnodes)
   if isa(node_to_vertex,AbstractVector)
     cell_to_vertices = Table(lazy_map(Broadcasting(Reindex(node_to_vertex)),cell_to_nodes))
   else
@@ -144,15 +164,32 @@ function _node_to_node_master!(node_to_node_master,gmsh,dimTags)
   end
 end
 
+function _order_from_dimtags(gmsh,dimTags)
+  max_order = -1
+  for (dim,tag) in dimTags
+    elemTypes, = gmsh.model.mesh.getElements(dim,tag)
+    for etype in elemTypes
+      order = _order_from_etype(gmsh,etype)
+      max_order = max(max_order,order)
+    end
+  end
+  if max_order == -1
+    gmsh.finalize()
+    error("No elements found")
+  end
+  max_order
+end
+
 function _setup_cell_dim(gmsh)
-  entities = gmsh.model.getEntities()
+  elemTypes, = gmsh.model.mesh.getElements()
   D = -1
-  for e in entities
-    D = max(D,e[1])
+  for etype in elemTypes
+    _,dim = gmsh.model.mesh.getElementProperties(etype)
+    D = max(D,dim)
   end
   if D == -1
     gmsh.finalize()
-    error("No entities in the msh file.")
+    error("No elements in the msh file.")
   end
   D
 end
@@ -187,11 +224,11 @@ function _setup_node_coords(gmsh,D)
   node_to_coords
 end
 
-function _fill_node_coords!(node_to_coords,nodeTags,coord,D)
+function _fill_node_coords!(node_to_coords,nodeTags,coord,D,Dp=D3)
   m = zero(Mutable(Point{D,Float64}))
   for node in nodeTags
     for j in 1:D
-      k = (node-1)*D3 + j
+      k = (node-1)*Dp + j
       xj = coord[k]
       m[j] = xj
     end
@@ -216,6 +253,7 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
   ncells, nmin, nmax = _check_cell_tags(elemTags)
 
   etype_to_nlnodes = _setup_etype_to_nlnodes(elemTypes,gmsh)
+  etype_to_lnode_to_glnode = _setup_etype_to_lnode_to_glnode(elemTypes,gmsh)
 
   ndata = sum([length(t) for t in nodeTags])
 
@@ -227,6 +265,7 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
     cell_to_nodes_prts,
     nmin-1,
     etype_to_nlnodes,
+    etype_to_lnode_to_glnode,
     elemTypes,
     elemTags,
     nodeTags,
@@ -241,8 +280,8 @@ function _setup_connectivity(gmsh,d,node_to_vertex,orient_if_simplex)
 end
 
 function _check_cell_tags(elemTags)
-  nmin::Int = minimum([minimum(t) for t in elemTags])
-  nmax::Int = maximum([maximum(t) for t in elemTags])
+  nmin::Int = minimum( minimum, elemTags )
+  nmax::Int = maximum( maximum, elemTags )
   ncells = sum([length(t) for t in elemTags])
   if !( (nmax-nmin+1) == ncells)
     gmsh.finalize()
@@ -262,11 +301,12 @@ function _setup_etype_to_nlnodes(elemTypes,gmsh)
   etype_to_nlnodes
 end
 
-function  _fill_connectivity!(
+function _fill_connectivity!(
     cell_to_nodes_data,
     cell_to_nodes_prts,
     o,
     etype_to_nlnodes,
+    etype_to_lnode_to_glnode,
     elemTypes,
     elemTags,
     nodeTags,
@@ -284,18 +324,18 @@ function  _fill_connectivity!(
 
   length_to_ptrs!(cell_to_nodes_prts)
 
+  c = array_cache(etype_to_lnode_to_glnode)
   for (j,etype) in enumerate(elemTypes)
     nlnodes = etype_to_nlnodes[etype]
     i_to_cell = elemTags[j]
     i_lnode_to_node = nodeTags[j]
+    glnode_to_lnode = getindex!(c,etype_to_lnode_to_glnode,etype)
     if (nlnodes == d+1) && orient_if_simplex
       # what we do here has to match with the OrientationStyle we
       # use when building the UnstructuredGrid
       _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
-    elseif (nlnodes == 4)
-      _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
-    elseif (nlnodes == 8)
-      _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
+    else
+      _permute_connectivities!(nlnodes,i_lnode_to_node,glnode_to_lnode)
     end
     for (i,cell) in enumerate(i_to_cell)
       a = cell_to_nodes_prts[cell-o]-1
@@ -319,18 +359,7 @@ function _orient_simplex_connectivities!(nlnodes,i_lnode_to_node,node_to_vertex)
   end
 end
 
-function _sort_quad_connectivites!(nlnodes,i_lnode_to_node)
-  aux = zero(eltype(i_lnode_to_node))
-  offset = nlnodes-1
-  for i in 1:nlnodes:length(i_lnode_to_node)
-    aux = i_lnode_to_node[i+offset-1]
-    i_lnode_to_node[i+offset-1] = i_lnode_to_node[i+offset]
-    i_lnode_to_node[i+offset] = aux
-  end
-end
-
-function _sort_hex_connectivites!(nlnodes,i_lnode_to_node)
-  perm = [1, 2, 4, 3, 5, 6, 8, 7]
+function _permute_connectivities!(nlnodes,i_lnode_to_node,perm)
   aux = zeros(eltype(i_lnode_to_node),nlnodes)
   offset = nlnodes-1
   for i in 1:nlnodes:length(i_lnode_to_node)
@@ -362,12 +391,7 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
     order = 1
   end
 
-  if order != 1
-    gmsh.finalize()
-    error("For the moment only for first-order elements")
-  end
-
-  reffe = _reffe_from_etype(etype)
+  reffe = _reffe_from_etype(gmsh,etype)
   reffes = [reffe,]
 
   boo = is_simplex(get_polytope(reffe)) && orient_if_simplex
@@ -377,23 +401,137 @@ function _setup_reffes(gmsh,d,orient_if_simplex)
   (cell_to_type, reffes, orientation)
 end
 
-function _reffe_from_etype(eltype)
-  if eltype == 1
+function _reffe_from_etype(gmsh,etype)
+  if etype == 1
     SEG2
-  elseif eltype == 2
+  elseif etype == 2
     TRI3
-  elseif eltype == 3
+  elseif etype == 3
     QUAD4
-  elseif eltype == 4
+  elseif etype == 4
     TET4
-  elseif eltype == 5
+  elseif etype == 5
     HEX8
-  elseif eltype == POINT
+  elseif etype == POINT
     VERTEX1
   else
-    gmsh.finalize()
-    error("Unsupported element type. elemType: $etype")
+    _lagrangian_reffe_from_etype(gmsh,etype)
   end
+end
+
+function _polytope_from_etype(gmsh,etype)
+  name, = gmsh.model.mesh.getElementProperties(etype)
+  if contains(name,"Point")
+    VERTEX
+  elseif contains(name,"Line")
+    SEGMENT
+  elseif contains(name,"Triangle")
+    TRI
+  elseif contains(name,"Tetrahedron")
+    TET
+  elseif contains(name,"Quadrilateral")
+    QUAD
+  elseif contains(name,"Hexahedron")
+    HEX
+  else
+    gmsh.finalize()
+    error("Unsupported element. $name, elemType: $etype")
+  end
+end
+
+function _lagrangian_reffe_from_etype(gmsh,etype)
+  order = _order_from_etype(gmsh,etype)
+  polytope = _polytope_from_etype(gmsh,etype)
+  reffe = LagrangianRefFE(Float64,polytope,order)
+  _check_reffe(gmsh,etype,reffe)
+  reffe
+end
+
+function _order_from_etype(gmsh,etype)
+  _,_,order = gmsh.model.mesh.getElementProperties(etype)
+  Int(order)
+end
+
+function _check_reffe(gmsh,etype,reffe)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(etype)
+  if num_dims(reffe) != dim ||
+     get_order(reffe) != order ||
+     num_nodes(reffe) != nnodes ||
+     num_vertices(get_polytope(reffe)) != nverts
+
+    gmsh.finalize()
+    error("Unsuported element. $name, elemType: $etype")
+  end
+end
+
+function _setup_etype_to_lnode_to_glnode(elemTypes,gmsh)
+  netypes = maximum(elemTypes)
+  etype_to_glnode_to_lnode_data = Int[]
+  etype_to_glnode_to_lnode_ptrs = zeros(Int,netypes+1)
+  for etype in elemTypes
+    ln_to_gln =_get_lnode_to_glnode(gmsh,etype)
+    append!(etype_to_glnode_to_lnode_data,ln_to_gln)
+    etype_to_glnode_to_lnode_ptrs[etype+1] = length(ln_to_gln)
+  end
+  length_to_ptrs!(etype_to_glnode_to_lnode_ptrs)
+  Table( etype_to_glnode_to_lnode_data, etype_to_glnode_to_lnode_ptrs )
+end
+
+function _get_node_coordinates(gmsh,etype)
+  name,dim,order,nnodes,coords,nverts = gmsh.model.mesh.getElementProperties(etype)
+  dim = Int(dim)
+  node_to_coords = zeros(Point{dim,Float64},nnodes)
+  _fill_node_coords!(node_to_coords,1:nnodes,coords,dim,dim)
+  node_to_coords
+end
+
+function _get_lnode_to_glnode(gmsh,etype)
+  reffe = _reffe_from_etype(gmsh,etype)
+  _get_lnode_to_glnode(gmsh,etype,reffe)
+end
+
+function _get_lnode_to_glnode(gmsh,etype,reffe::ReferenceFE{0})
+  [1]
+end
+
+function _get_lnode_to_glnode(gmsh,etype,reffe)
+  order = get_order(reffe)
+  glcoords = _get_node_coordinates(gmsh,etype)
+  lcoords = get_node_coordinates(reffe)
+  ln_to_gln = _link_equisipaced_coords(lcoords,glcoords,order)
+  if length(unique(ln_to_gln)) != length(ln_to_gln)
+    gmsh.finalize()
+    error("Unsuported element. $name, elemType: $etype")
+  end
+  ln_to_gln
+end
+
+function _link_equisipaced_coords(a,b,n)
+  a_to_int = _integer_coords(a,n)
+  b_to_int = _integer_coords(b,n)
+  int_to_b = Dict(b_to_int.=>1:length(b))
+  map(Reindex(int_to_b),a_to_int)
+end
+
+function _integer_coords(X,n)
+  xmin,xmax = _bounding_box(X)
+  map(X) do x
+    _integer_coords(x,xmin,xmax,n)
+  end
+end
+
+function _integer_coords(x,xmin,xmax,n)
+  f = (x-xmin)./(xmax-xmin) .*n
+  Point( Int.(round.(Tuple(f))) )
+end
+
+function _bounding_box(X)
+  xmin = xmax = X[1]
+  for x in X
+    xmin = min.(xmin,x)
+    xmax = max.(xmax,x)
+  end
+  xmin,xmax
 end
 
 function _setup_cell_to_entity(gmsh,d,ncells,nmin)
@@ -672,7 +810,7 @@ function _find_gface_to_face(
 
 end
 
-function  _fill_gface_to_face!(
+function _fill_gface_to_face!(
   gface_to_face,
   node_to_vertex,
   face_to_nodes_data,
@@ -704,7 +842,7 @@ function  _fill_gface_to_face!(
           vertex,
           node_to_faces_data,
           node_to_faces_ptrs)
-      else
+      elseif vertex != UNSET
         nfaces_around_scratch = _fill_cells_around_scratch!(
           faces_around_scratch,
           vertex,

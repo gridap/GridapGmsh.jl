@@ -50,6 +50,16 @@ model = GmshDiscreteModel(mshfile)
 test_discrete_model(model)
 check_interpolation(model)
 
+mshfile = joinpath(@__DIR__,"cubeSurface.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+check_interpolation(model)
+
+mshfile = joinpath(@__DIR__,"cubeOrder3.msh")
+model = GmshDiscreteModel(mshfile)
+test_discrete_model(model)
+check_interpolation(model)
+
 mshfile = joinpath(@__DIR__,"plane.msh")
 model = GmshDiscreteModel(mshfile)
 grid = get_grid(model)

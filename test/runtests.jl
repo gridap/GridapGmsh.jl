@@ -8,6 +8,10 @@ if GridapGmsh.GMSH_FOUND
     include("gmshTests.jl")
   end
 
+  @time @testset "ElementTypes" begin
+    include("ElementTypesTests.jl")
+  end
+
   @time @testset "GmshDiscreteModel" begin
    include("GmshDiscreteModelsTests.jl")
   end
