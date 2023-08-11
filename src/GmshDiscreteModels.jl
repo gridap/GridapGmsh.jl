@@ -940,7 +940,7 @@ end
 
 ## Parallel related
 
-function GmshDiscreteModel(parts::PArrays.AbstractPData, args...;kwargs...)
+function GmshDiscreteModel(parts::AbstractVector, args...;kwargs...)
   GmshDiscreteModel(parts,args...;kwargs...) do g,np
     if np == 1
       fill(Int32(1),size(g,1))
@@ -952,7 +952,7 @@ end
 
 function GmshDiscreteModel(
   do_partition,
-  parts::PArrays.AbstractPData,
+  parts::AbstractVector,
   args...;kwargs...)
 
   smodel = GmshDiscreteModel(args...;kwargs...)
