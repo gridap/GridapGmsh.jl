@@ -790,7 +790,7 @@ function _find_gface_to_face(
 
   ngfaces = length(gface_to_nodes_ptrs) - 1
   gface_to_face = fill(T(UNSET),ngfaces)
-  n = max_cells_arround_vertex(node_to_faces_ptrs)
+  n = max_cells_around_vertex(node_to_faces_ptrs)
   faces_around = fill(UNSET,n)
   faces_around_scratch = fill(UNSET,n)
 
@@ -940,7 +940,7 @@ end
 
 ## Parallel related
 
-function GmshDiscreteModel(parts::PArrays.AbstractPData, args...;kwargs...)
+function GmshDiscreteModel(parts::AbstractVector, args...;kwargs...)
   GmshDiscreteModel(parts,args...;kwargs...) do g,np
     if np == 1
       fill(Int32(1),size(g,1))
@@ -952,7 +952,7 @@ end
 
 function GmshDiscreteModel(
   do_partition,
-  parts::PArrays.AbstractPData,
+  parts::AbstractVector,
   args...;kwargs...)
 
   smodel = GmshDiscreteModel(args...;kwargs...)

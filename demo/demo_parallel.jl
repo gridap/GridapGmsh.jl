@@ -4,10 +4,11 @@ using GridapPETSc
 using GridapDistributed
 using PartitionedArrays
 n = 6
-prun(mpi,n) do parts
+with_mpi() do distribute 
+  ranks=distribute(LinearIndices((n,)))
   options = "-ksp_type cg -pc_type gamg -ksp_monitor"
   GridapPETSc.with(args=split(options)) do
-    model = GmshDiscreteModel(parts,"demo/demo.msh")
+    model = GmshDiscreteModel(ranks,"demo/demo.msh")
     order = 1
     dirichlet_tags = ["boundary1","boundary2"]
     u_boundary1(x) = 0.0
