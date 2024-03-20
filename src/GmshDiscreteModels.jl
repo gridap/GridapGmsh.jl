@@ -1,4 +1,5 @@
 
+const D2=2
 const D3=3
 const POINT=15
 const UNSET = 0
@@ -74,7 +75,7 @@ end
 
 function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
 
-  if Dp == 3 && Dc == 2
+  if ( Dp == 3 && Dc == 2 ) || ( Dp == 2 && Dc == 1 )
     orient_if_simplex = false
   else
     orient_if_simplex = true
@@ -85,7 +86,7 @@ function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
   cell_to_entity = _setup_cell_to_entity(
     gmsh,Dc,length(cell_to_nodes),nminD)
 
-  if Dp == 3 && Dc == 2
+  if ( Dp == 3 && Dc == 2 ) || ( Dp == 2 && Dc == 1 )
     cell_coords = lazy_map(Broadcasting(Reindex(node_to_coords)),cell_to_nodes)
     ctype_shapefuns = map(get_shapefuns,reffes)
     cell_shapefuns = expand_cell_data(ctype_shapefuns,cell_to_type)
@@ -110,6 +111,13 @@ function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
 
   (grid, cell_to_entity)
 
+end
+
+function _unit_outward_normal(v::MultiValue{Tuple{1,2}})
+  n1 =  v[1,2]
+  n2 = -v[1,1]
+  n = VectorValue(n1,n2)
+  n/norm(n)
 end
 
 function _unit_outward_normal(v::MultiValue{Tuple{2,3}})
@@ -199,12 +207,18 @@ function _setup_point_dim(gmsh,Dc)
     return Dc
   end
   nodeTags, coord, parametricCoord = gmsh.model.mesh.getNodes()
-  for node in nodeTags
-    j = D3
-    k = (node-1)*D3 + j
-    xj = coord[k]
-    if !(xj + 1 ≈ 1)
+  for node in nodeTags # Search a non-zero z-coordinate
+    k = (node-1)*D3 + D3
+    xk = coord[k]
+    if !(xk + 1 ≈ 1)
       return D3
+    end
+  end
+  for node in nodeTags # Search a non-zero y-coordinate
+    j = (node-1)*D3 + D2
+    xj = coord[j]
+    if !(xj + 1 ≈ 1)
+      return D2
     end
   end
   Dc
