@@ -4,7 +4,12 @@ const D3=3
 const POINT=15
 const UNSET = 0
 
-function GmshDiscreteModel(mshfile; renumber=true)
+# Note on has_affine_map:
+# By default, the cell maps are only affine if the grid is simplicial. However, 
+# some cartesian-like grids can also have affine maps. You can force the creation of 
+# affine maps by setting has_affine_map=true.
+
+function GmshDiscreteModel(mshfile; renumber=true, has_affine_map=nothing)
   @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
@@ -17,18 +22,18 @@ function GmshDiscreteModel(mshfile; renumber=true)
   gmsh.open(mshfile)
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
-  model = GmshDiscreteModel(gmsh)
+  model = GmshDiscreteModel(gmsh;has_affine_map)
   gmsh.finalize()
   model
 end
 
-function GmshDiscreteModel(gmsh::Module)
+function GmshDiscreteModel(gmsh::Module; has_affine_map=nothing)
   Dc = _setup_cell_dim(gmsh)
   Dp = _setup_point_dim(gmsh,Dc)
   node_to_coords = _setup_node_coords(gmsh,Dp)
   nnodes = length(node_to_coords)
   vertex_to_node, node_to_vertex = _setup_nodes_and_vertices(gmsh,node_to_coords)
-  grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
+  grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map)
   cell_to_vertices, vertex_to_node, node_to_vertex = _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
@@ -73,7 +78,7 @@ function _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
   vertex_to_node, node_to_vertex
 end
 
-function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
+function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map=nothing)
 
   if ( Dp == 3 && Dc == 2 ) || ( Dp == 2 && Dc == 1 )
     orient_if_simplex = false
@@ -107,10 +112,11 @@ function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex)
     reffes,
     cell_to_type,
     orientation,
-    facet_normal)
+    facet_normal;
+    has_affine_map
+  )
 
-  (grid, cell_to_entity)
-
+  grid, cell_to_entity
 end
 
 function _unit_outward_normal(v::MultiValue{Tuple{1,2}})

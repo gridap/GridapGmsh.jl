@@ -97,4 +97,14 @@ test_discrete_model(model)
 model2 = Gridap.DiscreteModelFromFile(mshfile)
 test_discrete_model(model2)
 
+mshfile = joinpath(@__DIR__,"square.msh")
+model = GmshDiscreteModel(mshfile;has_affine_map=true)
+test_discrete_model(model)
+check_interpolation(model)
+
+mshfile = joinpath(@__DIR__,"cube.msh")
+model = GmshDiscreteModel(mshfile;has_affine_map=true)
+test_discrete_model(model)
+check_interpolation(model)
+
 end # module
