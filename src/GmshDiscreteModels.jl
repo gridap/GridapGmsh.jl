@@ -9,7 +9,7 @@ const UNSET = 0
 # some cartesian-like grids can also have affine maps. You can force the creation of 
 # affine maps by setting has_affine_map=true.
 
-function GmshDiscreteModel(mshfile; renumber=true, has_affine_map=nothing)
+function GmshDiscreteModel(mshfile; renumber=true, has_affine_map=nothing, orient_if_simplex=nothing)
   @check_if_loaded
   if !isfile(mshfile)
     error("Msh file not found: $mshfile")
@@ -22,18 +22,18 @@ function GmshDiscreteModel(mshfile; renumber=true, has_affine_map=nothing)
   gmsh.open(mshfile)
   renumber && gmsh.model.mesh.renumberNodes()
   renumber && gmsh.model.mesh.renumberElements()
-  model = GmshDiscreteModel(gmsh;has_affine_map)
+  model = GmshDiscreteModel(gmsh;has_affine_map,orient_if_simplex)
   gmsh.finalize()
   model
 end
 
-function GmshDiscreteModel(gmsh::Module; has_affine_map=nothing)
+function GmshDiscreteModel(gmsh::Module; has_affine_map=nothing, orient_if_simplex=nothing)
   Dc = _setup_cell_dim(gmsh)
   Dp = _setup_point_dim(gmsh,Dc)
   node_to_coords = _setup_node_coords(gmsh,Dp)
   nnodes = length(node_to_coords)
   vertex_to_node, node_to_vertex = _setup_nodes_and_vertices(gmsh,node_to_coords)
-  grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map)
+  grid, cell_to_entity = _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map,orient_if_simplex)
   cell_to_vertices, vertex_to_node, node_to_vertex = _setup_cell_to_vertices(grid,vertex_to_node,node_to_vertex)
   grid_topology = UnstructuredGridTopology(grid,cell_to_vertices,vertex_to_node)
   labeling = _setup_labeling(gmsh,grid,grid_topology,cell_to_entity,vertex_to_node,node_to_vertex)
@@ -78,12 +78,13 @@ function _setup_nodes_and_vertices_periodic(gmsh,dimTags,nnodes)
   vertex_to_node, node_to_vertex
 end
 
-function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map=nothing)
+function _setup_grid(gmsh,Dc,Dp,node_to_coords,node_to_vertex;has_affine_map=nothing,orient_if_simplex=nothing)
 
   if ( Dp == 3 && Dc == 2 ) || ( Dp == 2 && Dc == 1 )
+    @assert isnothing(orient_if_simplex)
     orient_if_simplex = false
   else
-    orient_if_simplex = true
+    orient_if_simplex = isnothing(orient_if_simplex) || orient_if_simplex
   end
 
   cell_to_nodes, nminD = _setup_connectivity(gmsh,Dc,node_to_vertex,orient_if_simplex)
